@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-family: Inter, system-ui, sans-serif;
+  }
+
+  body {
+    background-color: #f9fafb;
+    color: #111827;
+  }
+}
+
+@layer components {
+  .chat-message-user {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    margin-left: auto;
+    max-width: 18rem;
+    word-wrap: break-word;
+  }
+
+  .chat-message-assistant {
+    background-color: white;
+    color: #111827;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    margin-right: auto;
+    max-width: 20rem;
+    word-wrap: break-word;
+    border: 1px solid #e5e7eb;
+  }
+}

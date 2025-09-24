@@ -1,0 +1,23 @@
+{
+  "name": "eduhu.ki - Teacher AI Assistant",
+  "short_name": "eduhu.ki",
+  "description": "AI-powered assistant for teachers",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "orientation": "portrait-primary"
+}

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)",
+      "Bash(dir:*)",
+      "Bash(test:*)",
+      "Bash(python:*)",
+      "Bash(del \"C:\\Users\\steff\\Desktop\\eduhu-test\\generate-icons.py\")",
+      "WebFetch(domain:localhost)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(timeout 10s npm run dev)",
+      "WebFetch(domain:www.instantdb.com)",
+      "Bash(node:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(npx vercel:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

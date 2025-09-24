@@ -1,0 +1,60 @@
+{
+  "name": "eduhu-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run test && npm run test:e2e",
+    "test:ci": "jest --coverage --ci && playwright test",
+    "test:unit": "jest --testPathPattern=src/",
+    "test:integration": "jest --testPathPattern=tests/integration/",
+    "qa:check": "npm run lint && npm run test:coverage && npm run test:e2e",
+    "qa:teacher-workflows": "playwright test --grep='teacher workflow'",
+    "qa:performance": "playwright test --grep='performance'",
+    "qa:accessibility": "playwright test --grep='accessibility'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@headlessui/react": "^2.2.8",
+    "@instantdb/react": "^0.21.23",
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.13",
+    "autoprefixer": "^10.4.21",
+    "next": "^15.5.4",
+    "openai": "^5.23.0",
+    "postcss": "^8.5.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "web-vitals": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.14",
+    "axe-core": "^4.10.2",
+    "axe-playwright": "^2.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "lighthouse": "^12.2.1"
+  }
+}
