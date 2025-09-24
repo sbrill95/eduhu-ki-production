@@ -22,7 +22,11 @@
       "Bash(tree:*)",
       "Bash(npx vercel:*)",
       "Bash(git commit:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(vercel:*)",
+      "Bash(npm test)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
