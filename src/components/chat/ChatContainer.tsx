@@ -9,9 +9,9 @@ import {
   createChatSession,
   DatabaseError,
   monitorQueryPerformance,
-  useChatWithMessages
+  useChatWithMessages,
+  sortMessagesByTimestamp
 } from '@/lib/database'
-import { sortMessagesByTimestamp } from '@/lib/database'
 import type { Message } from '@/lib/instant'
 import { startMetricsCollection, PerformanceMonitor } from '@/lib/metrics'
 import { CacheManager } from '@/lib/cache'

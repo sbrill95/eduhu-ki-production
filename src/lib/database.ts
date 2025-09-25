@@ -1,6 +1,15 @@
 // Database utility functions for eduhu.ki chat application
 // Performance optimized with error handling and connection recovery
-import { db, type ChatSession, type Message, type Teacher, type TeacherMemory } from './instant'
+import {
+  db,
+  type ChatSession,
+  type Message,
+  type Teacher,
+  type TeacherMemory,
+  type ConversationContext,
+  type MemoryUpdate,
+  type SessionCreationOptions
+} from './instant'
 import { serverDb, generateId as serverGenerateId, type ChatSession as ServerChatSession, type Message as ServerMessage } from './instant-server'
 
 // PRIORITY 1 - SESSION MANAGEMENT OPERATIONS

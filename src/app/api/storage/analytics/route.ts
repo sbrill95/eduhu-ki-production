@@ -172,15 +172,16 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true, message: 'Metric recorded' })
 
-      case 'health_check':
+      case 'health_check': {
         // Trigger manual health check
         const healthReport = await storageMonitoring.getHealthReport()
         return NextResponse.json({
           success: true,
           health: healthReport
         })
+      }
 
-      case 'reset_metrics':
+      case 'reset_metrics': {
         // Reset/clear metrics (admin function)
         // This would need proper admin authentication in production
         if (process.env.NODE_ENV === 'production') {
@@ -194,6 +195,7 @@ export async function POST(request: NextRequest) {
           success: true,
           message: 'Metrics reset (development only)'
         })
+      }
 
       default:
         return NextResponse.json(

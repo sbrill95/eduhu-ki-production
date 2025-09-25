@@ -11,10 +11,9 @@ import {
   MEMORY_CONFIG,
   TeacherMemory
 } from '../memory'
-import { serverDb } from '../instant-server'
+import { serverDb, type Message } from '../instant-server'
 import { DatabaseError, withRetry } from '../database'
 import { id } from '@instantdb/core'
-import type { Message } from '../instant-server'
 
 // Mock external dependencies
 jest.mock('../instant-server')

@@ -3,13 +3,14 @@
  * Comprehensive plan for safely migrating existing data to new schema
  */
 
-import { db, generateId } from './instant'
-import type {
-  ChatSession,
-  Message,
-  Teacher,
-  TeacherPreferences,
-  TeacherMemory
+import {
+  db,
+  generateId,
+  type ChatSession,
+  type Message,
+  type Teacher,
+  type TeacherPreferences,
+  type TeacherMemory
 } from './instant'
 
 // ============================================================================

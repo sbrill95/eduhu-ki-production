@@ -9,7 +9,8 @@ import type {
   TeacherMemory,
   ConversationContext,
   FileUpload,
-  Artifact
+  Artifact,
+  TeacherPreferences
 } from './instant'
 import type { ApiResponse, RequestContext } from './api-contracts'
 
