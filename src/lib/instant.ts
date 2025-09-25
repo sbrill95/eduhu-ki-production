@@ -1,7 +1,7 @@
 import { init, i } from '@instantdb/react'
 
 // Get app ID from environment or fallback to demo
-const APP_ID = process.env.NEXT_PUBLIC_INSTANTDB_APP_ID || 'demo-app-id'
+const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || 'demo-app-id'
 
 // Production environment validation and warnings
 if (APP_ID === 'demo-app-id') {
