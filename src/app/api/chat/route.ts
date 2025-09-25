@@ -1,7 +1,8 @@
 import { OpenAIProvider, type ChatMessage } from '@/lib/ai'
 import { NextRequest } from 'next/server'
 import { addMessageToSession, getChatSession, validateSessionAccess } from '@/lib/database'
-import { getContextualConversation } from '@/lib/session-context'
+// TODO: Re-enable when session-context is separated from React hooks
+// import { getContextualConversation } from '@/lib/session-context'
 import { extractMemoriesFromMessage, saveMemory } from '@/lib/memory'
 import { db } from '@/lib/instant'
 
@@ -94,6 +95,8 @@ export async function POST(req: NextRequest) {
 
     if (sessionId && teacherId) {
       try {
+        // TODO: Re-enable contextual conversation when session-context is fixed
+        /*
         const contextResult = await getContextualConversation(sessionId, {
           includeMemories: true,
           maxMessages: 20, // Limit context for token management
@@ -120,6 +123,10 @@ export async function POST(req: NextRequest) {
           contextualMessages: contextualMessages.length,
           hasMemories: contextResult.contextMetadata.hasMemories
         })
+        */
+
+        // Temporary: Skip contextual conversation loading
+        console.log(`Skipping contextual conversation for session ${sessionId} - feature temporarily disabled`)
       } catch (contextError) {
         console.warn('Failed to load contextual conversation, using original messages:', contextError)
         // Continue with original messages if context loading fails

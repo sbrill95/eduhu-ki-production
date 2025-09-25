@@ -7,12 +7,17 @@ import pdfParse from 'pdf-parse'
 let createCanvas: any = null
 let loadImage: any = null
 
-try {
-  const canvas = require('canvas')
-  createCanvas = canvas.createCanvas
-  loadImage = canvas.loadImage
-} catch (error) {
-  console.warn('Canvas not available - thumbnail generation disabled:', error.message)
+// Only try to load canvas in Node.js environment and if it exists
+if (typeof window === 'undefined') {
+  try {
+    // Use dynamic import to avoid webpack bundling issues
+    const canvas = require('canvas')
+    createCanvas = canvas.createCanvas
+    loadImage = canvas.loadImage
+  } catch (error) {
+    console.warn('Canvas not available - thumbnail generation disabled')
+    // Don't log the full error in production to avoid noise
+  }
 }
 
 export interface FileProcessingResult {
