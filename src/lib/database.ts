@@ -1,7 +1,7 @@
 // Database utility functions for eduhu.ki chat application
 // Performance optimized with error handling and connection recovery
 import { db, type ChatSession, type Message, type Teacher, type TeacherMemory } from './instant'
-import { id } from '@instantdb/react'
+import { serverDb, generateId as serverGenerateId, type ChatSession as ServerChatSession, type Message as ServerMessage } from './instant-server'
 
 // PRIORITY 1 - SESSION MANAGEMENT OPERATIONS
 
@@ -11,25 +11,46 @@ export const createChatSession = async (
   title?: string,
   sessionType: 'lesson_planning' | 'general' | 'assessment' | 'curriculum' = 'general'
 ): Promise<string> => {
-  const sessionId = id()
+  const sessionId = typeof window === 'undefined' ? serverGenerateId() : crypto.randomUUID()
   const now = Date.now()
   const defaultTitle = title || `${sessionType.replace('_', ' ')} session`
 
   try {
+    // Use Edge Runtime compatible server client when available
+    const dbClient = typeof window === 'undefined' ? serverDb : db
+
     await withRetry(async () => {
-      return db.transact([
-        db.tx.chat_sessions[sessionId].update({
-          teacher_id: teacherId,
-          title: defaultTitle,
-          created_at: now,
-          updated_at: now,
-          last_message_at: now,
-          message_count: 0,
-          session_type: sessionType,
-          is_archived: false,
-          is_pinned: false,
-        })
-      ])
+      if (typeof window === 'undefined') {
+        // Server-side Edge Runtime compatible transaction
+        return serverDb.transact([
+          serverDb.tx.chat_sessions(sessionId).update({
+            teacher_id: teacherId,
+            title: defaultTitle,
+            created_at: now,
+            updated_at: now,
+            last_message_at: now,
+            message_count: 0,
+            session_type: sessionType,
+            is_archived: false,
+            is_pinned: false,
+          })
+        ])
+      } else {
+        // Client-side React-based transaction
+        return db.transact([
+          db.tx.chat_sessions[sessionId].update({
+            teacher_id: teacherId,
+            title: defaultTitle,
+            created_at: now,
+            updated_at: now,
+            last_message_at: now,
+            message_count: 0,
+            session_type: sessionType,
+            is_archived: false,
+            is_pinned: false,
+          })
+        ])
+      }
     })
 
     console.log(`Created chat session ${sessionId} for teacher ${teacherId}`)
@@ -94,6 +115,11 @@ export const getChatSessions = async (
 // Gets single chat session by ID
 export const getChatSession = async (sessionId: string): Promise<ChatSession | null> => {
   try {
+    // Use Edge Runtime compatible server client when available
+    if (typeof window === 'undefined') {
+      return await serverDb.getChatSession(sessionId)
+    }
+
     const result = await db.query({
       chat_sessions: {
         $: {
@@ -186,10 +212,22 @@ export const addMessageToSession = async (
     intentClassification?: string
   }
 ): Promise<string> => {
-  const messageId = id()
+  const messageId = typeof window === 'undefined' ? serverGenerateId() : crypto.randomUUID()
   const timestamp = Date.now()
 
   try {
+    // Use Edge Runtime compatible server client when available
+    if (typeof window === 'undefined') {
+      return await serverDb.addMessageToSession(sessionId, content, role, {
+        teacherId: metadata?.teacherId,
+        contentType: metadata?.contentType,
+        tokenCount: metadata?.tokenCount,
+        responseTimeMs: metadata?.responseTimeMs,
+        educationalTopics: metadata?.educationalTopics,
+        intentClassification: metadata?.intentClassification
+      })
+    }
+
     // Get session to verify it exists and get teacher_id
     const session = await getChatSession(sessionId)
     if (!session) {
@@ -278,7 +316,7 @@ export const useChatSessions = (teacherId?: string, limit: number = 50) => {
         order: {
           last_message_at: 'desc'
         },
-        limit: limit
+        limit
       }
     }
   })
@@ -304,7 +342,7 @@ export const useMessages = (sessionId?: string, limit: number = 100) => {
         order: {
           timestamp: 'asc'
         },
-        limit: limit
+        limit
       }
     }
   })
@@ -339,13 +377,13 @@ export const useChatWithMessages = (sessionId?: string) => {
 }
 
 // Utility functions
-// Helper function for generating IDs (using InstantDB's id())
-export const generateId = () => id()
+// Helper function for generating IDs (using crypto.randomUUID)
+export const generateId = () => crypto.randomUUID()
 
 export const formatChatTitle = (firstMessage: string, maxLength: number = 50): string => {
   const cleaned = firstMessage.trim().replace(/\n/g, ' ')
   return cleaned.length > maxLength
-    ? cleaned.substring(0, maxLength) + '...'
+    ? `${cleaned.substring(0, maxLength)  }...`
     : cleaned
 }
 
@@ -405,7 +443,7 @@ export const generateContextualTitle = async (
   }
 
   if (title.length > maxLength) {
-    title = title.substring(0, maxLength - 3) + '...'
+    title = `${title.substring(0, maxLength - 3)  }...`
   }
 
   return title || `${sessionType || 'Chat'} - ${new Date().toLocaleTimeString()}`
@@ -466,6 +504,11 @@ export const validateSessionAccess = async (
   teacherId: string
 ): Promise<boolean> => {
   try {
+    // Use Edge Runtime compatible server client when available
+    if (typeof window === 'undefined') {
+      return await serverDb.validateSessionAccess(sessionId, teacherId)
+    }
+
     const session = await getChatSession(sessionId)
     return session?.teacher_id === teacherId
   } catch (error) {
@@ -551,7 +594,7 @@ export const testDatabaseConnection = async (): Promise<boolean> => {
   try {
     // Test with a lightweight query
     await withRetry(async () => {
-      const testId = id()
+      const testId = crypto.randomUUID()
       // Just test the transaction syntax without actually creating data
       return db.transact([])
     })

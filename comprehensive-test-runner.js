@@ -441,7 +441,7 @@ class ComprehensiveTestRunner {
   }
 
   generateTestReport() {
-    console.log('\n' + '='.repeat(80));
+    console.log(`\n${  '='.repeat(80)}`);
     console.log('📊 COMPREHENSIVE TEST EXECUTION REPORT');
     console.log('='.repeat(80));
 
@@ -532,7 +532,7 @@ class ComprehensiveTestRunner {
       }
     }
 
-    console.log('\n' + '='.repeat(80));
+    console.log(`\n${  '='.repeat(80)}`);
     console.log('📝 RECOMMENDATIONS:');
 
     if (this.results.failed > 0) {
@@ -551,12 +551,12 @@ class ComprehensiveTestRunner {
     }
 
     console.log('\n📄 TEST EXECUTION COMPLETE');
-    console.log('='.repeat(80) + '\n');
+    console.log(`${'='.repeat(80)  }\n`);
   }
 
   async runComprehensiveTestSuite() {
     console.log('🧪 STARTING COMPREHENSIVE S3 STORAGE ADAPTER AND FILE SERVING API TEST SUITE');
-    console.log('='.repeat(80) + '\n');
+    console.log(`${'='.repeat(80)  }\n`);
 
     this.createTestEnvironment();
 

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="5" failures="0" errors="0" time="2.078">
+  <testsuite name="Utils" errors="0" failures="0" skipped="0" timestamp="2025-09-25T11:50:18" time="0.845" tests="5">
+    <testcase classname="Utils › cn (className utility)" name="should merge class names correctly" time="0.02">
+    </testcase>
+    <testcase classname="Utils › cn (className utility)" name="should handle conditional classes" time="0.002">
+    </testcase>
+    <testcase classname="Utils › cn (className utility)" name="should handle empty/null values" time="0.001">
+    </testcase>
+    <testcase classname="Utils › cn (className utility)" name="should merge tailwind classes properly" time="0.002">
+    </testcase>
+    <testcase classname="Utils › cn (className utility)" name="should handle object-style conditional classes" time="0.001">
+    </testcase>
+  </testsuite>
+</testsuites>

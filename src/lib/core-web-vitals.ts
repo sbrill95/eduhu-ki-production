@@ -133,7 +133,7 @@ export function initPerformanceMonitoring() {
             reportWebVital({
               name: 'TTFB',
               value: navEntry.responseStart - navEntry.fetchStart,
-              id: 'ttfb-' + Math.random().toString(36).substr(2, 9),
+              id: `ttfb-${  Math.random().toString(36).substr(2, 9)}`,
             })
           }
         }
@@ -178,7 +178,7 @@ export function initPerformanceMonitoring() {
             reportWebVital({
               name: 'Long Task',
               value: entry.duration,
-              id: 'lt-' + Math.random().toString(36).substr(2, 9),
+              id: `lt-${  Math.random().toString(36).substr(2, 9)}`,
             })
           }
         }

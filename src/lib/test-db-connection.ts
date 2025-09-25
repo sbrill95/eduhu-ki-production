@@ -23,7 +23,7 @@ export const testInstantDBConnection = async (): Promise<{
     return {
       success: true,
       message: '✅ InstantDB connection successful with real app ID',
-      appId: appId.substring(0, 8) + '...' // Partially mask for security
+      appId: `${appId.substring(0, 8)  }...` // Partially mask for security
     }
   } catch (error) {
     return {
@@ -40,7 +40,7 @@ export const useDBConnectionTest = () => {
 
   return {
     isDemo: appId === 'demo-app-id',
-    appId: appId === 'demo-app-id' ? appId : appId.substring(0, 8) + '...',
+    appId: appId === 'demo-app-id' ? appId : `${appId.substring(0, 8)  }...`,
     status: appId === 'demo-app-id' ? 'warning' : 'connected'
   }
 }

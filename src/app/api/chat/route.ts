@@ -4,7 +4,7 @@ import { addMessageToSession, getChatSession, validateSessionAccess } from '@/li
 // TODO: Re-enable when session-context is separated from React hooks
 // import { getContextualConversation } from '@/lib/session-context'
 import { extractMemoriesFromMessage, saveMemory } from '@/lib/memory'
-import { db } from '@/lib/instant'
+import { serverDb } from '@/lib/instant-server'
 
 export const runtime = 'edge' // For low latency
 export const dynamic = 'force-dynamic'
@@ -19,13 +19,11 @@ export async function POST(req: NextRequest) {
     if (fileAttachments && Array.isArray(fileAttachments) && fileAttachments.length > 0) {
       // Fetch full file details from database using file IDs
       try {
-        const fileQuery = await db.useQuery({
-          file_uploads: {
-            $: {
-              where: {
-                id: { in: fileAttachments.map((f: any) => f.id || f.fileId) },
-                teacher_id: teacherId
-              }
+        const fileQuery = await serverDb.queryFileUploads({
+          $: {
+            where: {
+              id: { in: fileAttachments.map((f: any) => f.id || f.fileId) },
+              teacher_id: teacherId
             }
           }
         })
@@ -87,8 +85,8 @@ export async function POST(req: NextRequest) {
     })
 
     // Get contextual conversation if session ID provided
-    let contextualMessages = validMessages
-    let responseMetadata: any = {
+    const contextualMessages = validMessages
+    const responseMetadata: any = {
       hasFileAttachments: processedFileAttachments.length > 0,
       fileAttachmentCount: processedFileAttachments.length
     }
@@ -205,13 +203,13 @@ export async function POST(req: NextRequest) {
                     if (processedFileAttachments.length > 0) {
                       try {
                         const fileUpdates = processedFileAttachments.map(file =>
-                          db.tx.file_uploads[file.id].update({
+                          serverDb.tx.file_uploads(file.id).update({
                             message_id: userMessageId,
                             session_id: sessionId
                           })
                         )
 
-                        await db.transact(fileUpdates)
+                        await serverDb.transact(fileUpdates)
                         console.log(`Linked ${processedFileAttachments.length} files to message ${userMessageId}`)
                       } catch (linkError) {
                         console.warn('Failed to link files to message:', linkError)

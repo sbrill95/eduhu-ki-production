@@ -1,4 +1,14 @@
-import { init, i } from '@instantdb/react'
+// Environment detection to prevent server-side React imports
+const isServer = typeof window === 'undefined'
+
+// Only import React version on client-side
+let init: any, i: any, reactDb: any
+
+if (!isServer) {
+  const reactModule = require('@instantdb/react')
+  init = reactModule.init
+  i = reactModule.i
+}
 
 // Get app ID from environment or fallback to demo
 const APP_ID = process.env.NEXT_PUBLIC_INSTANT_APP_ID || 'demo-app-id'
@@ -223,11 +233,23 @@ const schema = i.schema({
   },
 })
 
-// Initialize database with schema
-export const db = init({
-  appId: APP_ID,
-  schema
-})
+// Initialize database with schema (client-side only)
+export let db: any = null
+
+if (!isServer && init && i) {
+  db = init({
+    appId: APP_ID,
+    schema
+  })
+} else {
+  // Create a mock object for server-side to prevent errors
+  db = {
+    useQuery: () => ({ data: null, isLoading: false, error: null }),
+    query: () => Promise.resolve({}),
+    transact: () => Promise.resolve({}),
+    tx: {}
+  }
+}
 
 // Enhanced TypeScript types for comprehensive data architecture
 

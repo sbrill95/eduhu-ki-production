@@ -96,7 +96,7 @@ export async function GET(
     let fileBuffer: Buffer
     let fileStats: { size: number; mtime?: Date; birthtime?: Date }
     let mimeType = 'application/octet-stream'
-    let filename = path.basename(actualPath)
+    const filename = path.basename(actualPath)
 
     // Try local storage first (for development)
     const uploadDir = path.join(

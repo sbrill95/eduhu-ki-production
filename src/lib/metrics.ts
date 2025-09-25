@@ -175,7 +175,7 @@ export class PerformanceMonitor {
     // Track educational topic distribution
     eduMetrics.topicCategories.forEach(category => {
       metrics.recordMetric('education_topic_usage', 1, {
-        category: category
+        category
       })
     })
 

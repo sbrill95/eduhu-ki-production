@@ -280,7 +280,7 @@ export class R2StorageAdapter implements CloudStorageAdapter {
         ContentLength: thumbnailBuffer.length,
         CacheControl: 'public, max-age=31536000', // Cache for 1 year
         Metadata: {
-          originalFilename: originalFilename,
+          originalFilename,
           type: 'thumbnail',
           generatedAt: new Date().toISOString()
         }

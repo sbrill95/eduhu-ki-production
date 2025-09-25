@@ -97,8 +97,8 @@ export default function ChatContainer({ sessionId }: ChatContainerProps) {
     try {
       // Create chat if needed
       if (!activeChatId || messagesError) {
-        const title = content.length > 50 ? content.substring(0, 50) + '...' : content
-        const teacherId = 'demo-teacher-' + crypto.randomUUID().substring(0, 8); activeChatId = await createChatSession(teacherId, title)
+        const title = content.length > 50 ? `${content.substring(0, 50)  }...` : content
+        const teacherId = `demo-teacher-${  crypto.randomUUID().substring(0, 8)}`; activeChatId = await createChatSession(teacherId, title)
         setCurrentChatId(activeChatId)
       }
 
@@ -108,7 +108,7 @@ export default function ChatContainer({ sessionId }: ChatContainerProps) {
         const uploadPromises = files.map(async (file) => {
           const formData = new FormData()
           formData.append('file', file)
-          formData.append('teacherId', 'demo-teacher-' + crypto.randomUUID().substring(0, 8))
+          formData.append('teacherId', `demo-teacher-${  crypto.randomUUID().substring(0, 8)}`)
           formData.append('sessionId', activeChatId)
 
           const uploadResponse = await fetch('/api/upload', {

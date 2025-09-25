@@ -176,7 +176,7 @@ export const summarizeSession = async (
 
       // Trim to max length
       if (summary.length > maxLength) {
-        summary = summary.slice(0, maxLength - 3) + '...'
+        summary = `${summary.slice(0, maxLength - 3)  }...`
       }
     }
 

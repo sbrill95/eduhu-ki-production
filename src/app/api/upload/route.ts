@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         originalFilename: file.name,
         fileType: file.type,
         fileSize: file.size,
-        fileUrl: fileUrl,
+        fileUrl,
         processingStatus: 'pending',
         uploadTime: Date.now() - startTime
       }

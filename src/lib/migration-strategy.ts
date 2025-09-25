@@ -274,7 +274,7 @@ export const SINGLE_CHAT_TO_MULTI_SESSION_MIGRATION: MigrationPlan = {
       execute: async (): Promise<MigrationStepResult> => {
         const startTime = Date.now()
         let recordsProcessed = 0
-        let recordsSkipped = 0
+        const recordsSkipped = 0
         const errors: string[] = []
         const warnings: string[] = []
 

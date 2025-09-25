@@ -30,7 +30,7 @@ export default function ChatSidebar({ currentChatId, onChatSelect }: ChatSidebar
 
   const formatChatTitle = (chat: Chat) => {
     if (chat.title && chat.title !== 'New Conversation') {
-      return chat.title.length > 30 ? chat.title.substring(0, 30) + '...' : chat.title
+      return chat.title.length > 30 ? `${chat.title.substring(0, 30)  }...` : chat.title
     }
     return 'New Conversation'
   }

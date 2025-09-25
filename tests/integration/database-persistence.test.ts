@@ -20,7 +20,7 @@ const SYNC_WAIT_TIME = 2000 // 2 seconds for real-time sync
 
 describe('InstantDB Integration Tests', () => {
   let testChatId: string
-  let cleanup: (() => void)[] = []
+  const cleanup: (() => void)[] = []
 
   beforeAll(async () => {
     // Verify database connection before running tests

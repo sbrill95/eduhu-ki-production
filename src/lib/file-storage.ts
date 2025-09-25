@@ -407,18 +407,19 @@ export async function deleteFileFromCloudStorage(filename: string): Promise<bool
  * Enhanced thumbnail save function for cloud storage
  */
 export async function saveThumbnailToCloudStorage(
-  thumbnailBuffer: Buffer,
+  thumbnailBuffer: Uint8Array,
   originalFilename: string
 ): Promise<string> {
   const storageAdapter = createStorageAdapter()
 
   if (storageAdapter && 'saveThumbnail' in storageAdapter) {
     // Use cloud storage (S3)
-    return await (storageAdapter as S3StorageAdapter).saveThumbnail(thumbnailBuffer, originalFilename)
+    const buffer = Buffer.from(thumbnailBuffer)
+    return await (storageAdapter as S3StorageAdapter).saveThumbnail(buffer, originalFilename)
   } else {
     // Fall back to local storage
-    const file = new File([thumbnailBuffer], createThumbnailPath(originalFilename), { type: 'image/jpeg' })
-    return await saveThumbnailToStorage(thumbnailBuffer, originalFilename)
+    const buffer = Buffer.from(thumbnailBuffer)
+    return await saveThumbnailToStorage(buffer, originalFilename)
   }
 }
 
@@ -753,7 +754,7 @@ export class S3StorageAdapter implements CloudStorageAdapter {
         ContentLength: thumbnailBuffer.length,
         CacheControl: 'public, max-age=31536000', // Cache for 1 year
         Metadata: {
-          originalFilename: originalFilename,
+          originalFilename,
           type: 'thumbnail',
           generatedAt: new Date().toISOString()
         }

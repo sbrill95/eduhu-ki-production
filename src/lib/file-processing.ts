@@ -1,24 +1,8 @@
-import { FILE_UPLOAD_CONFIG } from '@/lib/instant'
+import { FILE_UPLOAD_CONFIG } from '@/lib/instant-server'
 import { saveThumbnailToCloudStorage } from '@/lib/file-storage'
+import { processImageModern } from '@/lib/modern-image-processing'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse'
-
-// Optional canvas import for thumbnail generation
-let createCanvas: any = null
-let loadImage: any = null
-
-// Only try to load canvas in Node.js environment and if it exists
-if (typeof window === 'undefined') {
-  try {
-    // Use dynamic import to avoid webpack bundling issues
-    const canvas = require('canvas')
-    createCanvas = canvas.createCanvas
-    loadImage = canvas.loadImage
-  } catch (error) {
-    console.warn('Canvas not available - thumbnail generation disabled')
-    // Don't log the full error in production to avoid noise
-  }
-}
 
 export interface FileProcessingResult {
   success: boolean
@@ -50,7 +34,7 @@ export async function processFile(file: File, fileUrl: string): Promise<FileProc
 
     // Process based on file type
     if (file.type.startsWith('image/')) {
-      const result = await processImage(uint8Array, file.type, file.name)
+      const result = await processImageModern(uint8Array, file.type, file.name)
       extractedText = result.extractedText
       thumbnailUrl = result.thumbnailUrl
       metadata = { ...metadata, ...result.metadata }
@@ -112,97 +96,8 @@ export async function processFile(file: File, fileUrl: string): Promise<FileProc
   }
 }
 
-/**
- * Process image files - generate thumbnails and extract metadata
- */
-async function processImage(
-  buffer: Uint8Array,
-  mimeType: string,
-  filename: string
-): Promise<{ extractedText?: string; thumbnailUrl?: string; metadata?: Record<string, any>; errors?: string[] }> {
-  const errors: string[] = []
-  let thumbnailUrl: string | undefined
-  let metadata: Record<string, any> = {}
-
-  try {
-    // Create image from buffer
-    const blob = new Blob([buffer], { type: mimeType })
-    const imageUrl = URL.createObjectURL(blob)
-
-    if (createCanvas && loadImage) {
-      try {
-        // Load image using canvas (Node.js environment)
-        const image = await loadImage(buffer)
-
-        metadata.originalWidth = image.width
-        metadata.originalHeight = image.height
-        metadata.aspectRatio = image.width / image.height
-
-        // Generate thumbnail
-        const { width: thumbWidth, height: thumbHeight } = FILE_UPLOAD_CONFIG.THUMBNAIL_SIZE
-
-        // Calculate dimensions maintaining aspect ratio
-        let finalWidth = thumbWidth
-        let finalHeight = thumbHeight
-
-        if (image.width > image.height) {
-          finalHeight = Math.round((thumbWidth / image.width) * image.height)
-        } else {
-          finalWidth = Math.round((thumbHeight / image.height) * image.width)
-        }
-
-        // Create thumbnail canvas
-        const canvas = createCanvas(finalWidth, finalHeight)
-        const ctx = canvas.getContext('2d')
-
-        // Draw resized image
-        ctx.drawImage(image, 0, 0, finalWidth, finalHeight)
-
-        // Convert canvas to buffer for cloud storage
-        const thumbnailBuffer = canvas.toBuffer('image/jpeg', { quality: 0.8 })
-
-        try {
-          // Upload thumbnail to cloud storage
-          thumbnailUrl = await saveThumbnailToCloudStorage(thumbnailBuffer, filename)
-        } catch (thumbnailError) {
-          console.error('Thumbnail upload error:', thumbnailError)
-          errors.push('Failed to upload generated thumbnail')
-
-          // Fallback to base64 data URL for development
-          if (process.env.NODE_ENV === 'development') {
-            thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8)
-          }
-        }
-
-        metadata.thumbnailWidth = finalWidth
-        metadata.thumbnailHeight = finalHeight
-
-      } catch (imageError) {
-        console.error('Image processing error:', imageError)
-        errors.push('Failed to process image for thumbnail generation')
-      } finally {
-        URL.revokeObjectURL(imageUrl)
-      }
-    } else {
-      // Canvas not available - skip thumbnail generation
-      console.warn('Canvas not available - skipping thumbnail generation for image')
-      errors.push('Thumbnail generation skipped - canvas not available in production')
-      metadata.thumbnailSkipped = true
-    }
-
-    // For images, there's no text to extract unless we implement OCR
-    // This would be where you'd integrate with services like Google Vision API or Tesseract
-    // For now, we'll just note that OCR isn't implemented
-    metadata.ocrAvailable = false
-    metadata.ocrNote = 'OCR text extraction not implemented yet'
-
-  } catch (error) {
-    console.error('Image processing error:', error)
-    errors.push(error instanceof Error ? error.message : 'Unknown image processing error')
-  }
-
-  return { thumbnailUrl, metadata, errors }
-}
+// Image processing is now handled by modern-image-processing.ts
+// This function is kept for backward compatibility but delegates to the new implementation
 
 /**
  * Process PDF files - extract text and generate thumbnail
@@ -213,7 +108,7 @@ async function processPDF(
   const errors: string[] = []
   let extractedText: string | undefined
   let thumbnailUrl: string | undefined
-  let metadata: Record<string, any> = {}
+  const metadata: Record<string, any> = {}
 
   try {
     // Parse PDF and extract text
@@ -259,7 +154,7 @@ async function processWordDocument(
 ): Promise<{ extractedText?: string; metadata?: Record<string, any>; errors?: string[] }> {
   const errors: string[] = []
   let extractedText: string | undefined
-  let metadata: Record<string, any> = {}
+  const metadata: Record<string, any> = {}
 
   try {
     const docBuffer = Buffer.from(buffer)
@@ -308,7 +203,7 @@ async function processTextFile(
 ): Promise<{ extractedText?: string; metadata?: Record<string, any>; errors?: string[] }> {
   const errors: string[] = []
   let extractedText: string | undefined
-  let metadata: Record<string, any> = {}
+  const metadata: Record<string, any> = {}
 
   try {
     // Convert buffer to text using UTF-8 encoding

@@ -48,7 +48,7 @@ async function checkInstantDB() {
 
     return {
       status: 'healthy',
-      appId: appId.substring(0, 8) + '...' // Partial ID for security
+      appId: `${appId.substring(0, 8)  }...` // Partial ID for security
     }
   } catch (error) {
     return {
@@ -71,7 +71,7 @@ function checkOpenAI() {
     return {
       status: 'healthy',
       model: process.env.NEXT_PUBLIC_AI_MODEL || 'gpt-4o-mini',
-      keyPrefix: apiKey.substring(0, 7) + '...' // First 7 chars for verification
+      keyPrefix: `${apiKey.substring(0, 7)  }...` // First 7 chars for verification
     }
   } catch (error) {
     return {

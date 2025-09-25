@@ -146,7 +146,7 @@ export const getMemory = async (
         $: {
           where: {
             teacher_id: teacherId,
-            key: key,
+            key,
             memory_type: memoryType
           }
         }

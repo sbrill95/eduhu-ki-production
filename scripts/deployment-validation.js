@@ -350,7 +350,7 @@ class DeploymentValidator {
           resolve({
             statusCode: res.statusCode,
             headers: res.headers,
-            body: body
+            body
           })
         })
       })
