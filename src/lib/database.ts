@@ -219,6 +219,7 @@ export const addMessageToSession = async (
     responseTimeMs?: number
     educationalTopics?: string[]
     intentClassification?: string
+    metadata?: any
   }
 ): Promise<string> => {
   const messageId = typeof window === 'undefined' ? serverGenerateId() : crypto.randomUUID()
