@@ -4,7 +4,14 @@ export type ChatRole = 'system' | 'user' | 'assistant'
 
 export interface ChatMessage {
   role: ChatRole
-  content: string
+  content: string | Array<{
+    type: 'text' | 'image_url'
+    text?: string
+    image_url?: {
+      url: string
+      detail?: 'low' | 'high' | 'auto'
+    }
+  }>
 }
 
 // Rate limiting configuration
@@ -227,12 +234,90 @@ Always consider the teacher's time constraints and provide immediately useful ad
     return fallbacks[index]
   }
 
-  // Helper to format messages for OpenAI API
-  static formatMessagesForAPI(chatMessages: Array<{ content: string; role: 'user' | 'assistant' }>): ChatMessage[] {
-    return chatMessages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }))
+  // Helper to format messages for OpenAI API with file support
+  static formatMessagesForAPI(chatMessages: Array<{ content: string; role: 'user' | 'assistant'; fileAttachments?: any[] }>): ChatMessage[] {
+    return chatMessages.map(msg => {
+      // Handle file attachments for user messages
+      if (msg.role === 'user' && msg.fileAttachments && msg.fileAttachments.length > 0) {
+        const contentParts = [{ type: 'text' as const, text: msg.content }]
+
+        // Add image attachments for vision processing
+        msg.fileAttachments.forEach(file => {
+          if (file.file_type?.startsWith('image/') && file.file_url) {
+            contentParts.push({
+              type: 'image_url' as const,
+              image_url: {
+                url: file.file_url,
+                detail: 'high' as const
+              }
+            })
+          }
+        })
+
+        return {
+          role: msg.role,
+          content: contentParts
+        }
+      }
+
+      return {
+        role: msg.role,
+        content: msg.content
+      }
+    })
+  }
+
+  // Create message with file attachments
+  static createMessageWithFiles(
+    content: string,
+    role: 'user' | 'assistant',
+    fileAttachments?: Array<{
+      file_type: string
+      file_url: string
+      extracted_text?: string
+      original_filename: string
+    }>
+  ): ChatMessage {
+    if (role === 'user' && fileAttachments && fileAttachments.length > 0) {
+      const contentParts = [{ type: 'text' as const, text: content }]
+
+      // Add extracted text from documents to the message
+      const extractedTexts: string[] = []
+
+      fileAttachments.forEach(file => {
+        if (file.file_type?.startsWith('image/') && file.file_url) {
+          // Add image for vision processing
+          contentParts.push({
+            type: 'image_url' as const,
+            image_url: {
+              url: file.file_url,
+              detail: 'high' as const
+            }
+          })
+        } else if (file.extracted_text) {
+          // Include extracted text from PDFs, Word docs, etc.
+          extractedTexts.push(
+            `Content from ${file.original_filename}:\n${file.extracted_text.substring(0, 10000)}`
+          )
+        }
+      })
+
+      // If we have extracted text, add it to the main text content
+      if (extractedTexts.length > 0) {
+        const combinedText = `${content}\n\n${extractedTexts.join('\n\n---\n\n')}`
+        contentParts[0].text = combinedText
+      }
+
+      return {
+        role,
+        content: contentParts
+      }
+    }
+
+    return {
+      role,
+      content
+    }
   }
 
   // Input validation

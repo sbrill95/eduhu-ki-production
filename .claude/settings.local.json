@@ -27,7 +27,10 @@
       "Bash(npm test)",
       "Bash(git remote add:*)",
       "Bash(git push:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

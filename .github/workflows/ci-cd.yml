@@ -10,6 +10,20 @@ env:
   NODE_VERSION: '18.x'
   NEXT_PUBLIC_INSTANTDB_APP_ID: ${{ secrets.NEXT_PUBLIC_INSTANTDB_APP_ID }}
   NEXT_PUBLIC_AI_MODEL: 'gpt-4o-mini'
+  STORAGE_PROVIDER: ${{ secrets.STORAGE_PROVIDER || 's3' }}
+
+  # AWS S3 Configuration
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
+  AWS_S3_REGION: ${{ secrets.AWS_S3_REGION || 'us-east-1' }}
+
+  # CloudFlare R2 Configuration (alternative)
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
 jobs:
   # Code Quality & Testing
@@ -44,6 +58,35 @@ jobs:
 
       - name: Run integration tests
         run: npm run test:integration
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Test storage integration
+        run: |
+          # Test storage configuration based on provider
+          node -e "
+            const { createStorageAdapter } = require('./src/lib/file-storage');
+
+            console.log('Testing storage configuration...');
+            console.log('Storage Provider:', process.env.STORAGE_PROVIDER || 'local');
+
+            try {
+              const adapter = createStorageAdapter();
+              if (adapter) {
+                console.log('✅ Storage adapter created successfully');
+                if (adapter.isConfigured && adapter.isConfigured()) {
+                  console.log('✅ Storage adapter is properly configured');
+                } else {
+                  console.log('⚠️ Storage adapter created but may not be fully configured');
+                }
+              } else {
+                console.log('✅ Using local storage (development mode)');
+              }
+            } catch (error) {
+              console.log('❌ Storage adapter test failed:', error.message);
+              process.exit(1);
+            }
+          "
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -165,17 +208,94 @@ jobs:
           fi
           echo "✅ No obvious secrets found"
 
+  # Storage environment validation
+  storage-validation:
+    name: 'Storage Environment Validation'
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate storage configuration
+        run: |
+          echo "Validating storage configuration for production deployment..."
+
+          # Check storage provider
+          STORAGE_PROVIDER="${{ env.STORAGE_PROVIDER }}"
+          echo "Storage Provider: $STORAGE_PROVIDER"
+
+          case $STORAGE_PROVIDER in
+            s3)
+              if [[ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" || -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" || -z "${{ secrets.AWS_S3_BUCKET_NAME }}" ]]; then
+                echo "❌ AWS S3 configuration incomplete"
+                echo "Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME"
+                exit 1
+              fi
+              echo "✅ AWS S3 configuration validated"
+              ;;
+            r2)
+              if [[ -z "${{ secrets.R2_ACCESS_KEY_ID }}" || -z "${{ secrets.R2_SECRET_ACCESS_KEY }}" || -z "${{ secrets.R2_BUCKET_NAME }}" || -z "${{ secrets.R2_ACCOUNT_ID }}" ]]; then
+                echo "❌ CloudFlare R2 configuration incomplete"
+                echo "Required: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_ACCOUNT_ID"
+                exit 1
+              fi
+              echo "✅ CloudFlare R2 configuration validated"
+              ;;
+            local)
+              echo "⚠️ Using local storage for production is not recommended"
+              ;;
+            *)
+              echo "❌ Unknown storage provider: $STORAGE_PROVIDER"
+              exit 1
+              ;;
+          esac
+
   # Deployment to preview (on PR) or production (on main)
   deploy:
     name: 'Deploy to Vercel'
     runs-on: ubuntu-latest
     needs: [test, build, e2e, security]
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate storage configuration pre-deployment
+        run: |
+          echo "Pre-deployment storage validation..."
+          node -e "
+            const { createStorageAdapter } = require('./src/lib/file-storage');
+
+            console.log('Storage Provider:', process.env.STORAGE_PROVIDER || 'local');
+
+            try {
+              const adapter = createStorageAdapter();
+              if (adapter) {
+                console.log('✅ Storage adapter configuration validated');
+                if (adapter.getBucketInfo) {
+                  const info = adapter.getBucketInfo();
+                  console.log('Bucket info:', JSON.stringify(info, null, 2));
+                }
+              } else {
+                console.log('✅ Using local storage fallback');
+              }
+            } catch (error) {
+              console.log('⚠️ Storage validation warning:', error.message);
+              console.log('Deployment will continue with fallback storage');
+            }
+          "
 
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -186,6 +306,9 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
           working-directory: ./
+        env:
+          # Ensure environment variables are passed to Vercel
+          VERCEL_ENV_STORAGE_PROVIDER: ${{ env.STORAGE_PROVIDER }}
 
       - name: Deploy to Vercel (Preview)
         if: github.event_name == 'pull_request'
@@ -195,6 +318,9 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: ./
+        env:
+          # Use staging configuration for previews
+          VERCEL_ENV_STORAGE_PROVIDER: ${{ env.STORAGE_PROVIDER }}
 
   # Post-deployment validation
   validate-deployment:

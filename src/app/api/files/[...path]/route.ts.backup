@@ -1,0 +1,220 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { readFile, stat } from 'fs/promises'
+import path from 'path'
+import { getFileServingHeaders, STORAGE_CONFIG } from '@/lib/file-storage'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  try {
+    // Construct file path from URL parameters
+    const filePath = params.path.join('/')
+
+    if (!filePath) {
+      return NextResponse.json(
+        { error: 'File path required' },
+        { status: 400 }
+      )
+    }
+
+    // Security: Prevent path traversal attacks
+    if (filePath.includes('..') || filePath.includes('~')) {
+      return NextResponse.json(
+        { error: 'Invalid file path' },
+        { status: 400 }
+      )
+    }
+
+    // Determine if this is a thumbnail request
+    const isThumbnail = filePath.startsWith('thumbnails/')
+    const actualPath = isThumbnail
+      ? filePath.replace('thumbnails/', '')
+      : filePath
+
+    // Construct full file path
+    const uploadDir = path.join(
+      process.cwd(),
+      STORAGE_CONFIG.LOCAL_STORAGE_DIR,
+      isThumbnail ? 'thumbnails' : '',
+      actualPath
+    )
+
+    try {
+      // Check if file exists and get stats
+      const fileStats = await stat(uploadDir)
+
+      if (!fileStats.isFile()) {
+        return NextResponse.json(
+          { error: 'Path is not a file' },
+          { status: 404 }
+        )
+      }
+
+      // Read file
+      const fileBuffer = await readFile(uploadDir)
+
+      // Determine MIME type from file extension
+      const extension = path.extname(actualPath).toLowerCase()
+      let mimeType = 'application/octet-stream'
+
+      switch (extension) {
+        case '.jpg':
+        case '.jpeg':
+          mimeType = 'image/jpeg'
+          break
+        case '.png':
+          mimeType = 'image/png'
+          break
+        case '.gif':
+          mimeType = 'image/gif'
+          break
+        case '.webp':
+          mimeType = 'image/webp'
+          break
+        case '.pdf':
+          mimeType = 'application/pdf'
+          break
+        case '.doc':
+          mimeType = 'application/msword'
+          break
+        case '.docx':
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          break
+        case '.txt':
+          mimeType = 'text/plain'
+          break
+        case '.csv':
+          mimeType = 'text/csv'
+          break
+        case '.md':
+          mimeType = 'text/markdown'
+          break
+      }
+
+      // Get appropriate headers for file type
+      const filename = path.basename(actualPath)
+      const headers = getFileServingHeaders(filename, mimeType)
+
+      // Add file size header
+      headers['Content-Length'] = fileStats.size.toString()
+
+      // Return file with appropriate headers
+      return new NextResponse(fileBuffer, {
+        status: 200,
+        headers
+      })
+
+    } catch (fileError) {
+      if ((fileError as NodeJS.ErrnoException).code === 'ENOENT') {
+        return NextResponse.json(
+          { error: 'File not found' },
+          { status: 404 }
+        )
+      }
+
+      console.error('Error reading file:', fileError)
+      return NextResponse.json(
+        { error: 'Failed to read file' },
+        { status: 500 }
+      )
+    }
+
+  } catch (error) {
+    console.error('File serving error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Handle HEAD requests for file info without downloading
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  try {
+    const filePath = params.path.join('/')
+
+    if (!filePath) {
+      return new NextResponse(null, { status: 400 })
+    }
+
+    // Security: Prevent path traversal attacks
+    if (filePath.includes('..') || filePath.includes('~')) {
+      return new NextResponse(null, { status: 400 })
+    }
+
+    const isThumbnail = filePath.startsWith('thumbnails/')
+    const actualPath = isThumbnail
+      ? filePath.replace('thumbnails/', '')
+      : filePath
+
+    const uploadDir = path.join(
+      process.cwd(),
+      STORAGE_CONFIG.LOCAL_STORAGE_DIR,
+      isThumbnail ? 'thumbnails' : '',
+      actualPath
+    )
+
+    try {
+      const fileStats = await stat(uploadDir)
+
+      if (!fileStats.isFile()) {
+        return new NextResponse(null, { status: 404 })
+      }
+
+      const filename = path.basename(actualPath)
+      const extension = path.extname(actualPath).toLowerCase()
+
+      // Determine MIME type
+      let mimeType = 'application/octet-stream'
+      switch (extension) {
+        case '.jpg':
+        case '.jpeg':
+          mimeType = 'image/jpeg'
+          break
+        case '.png':
+          mimeType = 'image/png'
+          break
+        case '.gif':
+          mimeType = 'image/gif'
+          break
+        case '.webp':
+          mimeType = 'image/webp'
+          break
+        case '.pdf':
+          mimeType = 'application/pdf'
+          break
+        case '.doc':
+          mimeType = 'application/msword'
+          break
+        case '.docx':
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          break
+        case '.txt':
+          mimeType = 'text/plain'
+          break
+      }
+
+      const headers = getFileServingHeaders(filename, mimeType)
+      headers['Content-Length'] = fileStats.size.toString()
+
+      return new NextResponse(null, {
+        status: 200,
+        headers
+      })
+
+    } catch (fileError) {
+      if ((fileError as NodeJS.ErrnoException).code === 'ENOENT') {
+        return new NextResponse(null, { status: 404 })
+      }
+
+      return new NextResponse(null, { status: 500 })
+    }
+
+  } catch (error) {
+    return new NextResponse(null, { status: 500 })
+  }
+}

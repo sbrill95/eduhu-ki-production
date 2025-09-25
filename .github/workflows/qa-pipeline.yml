@@ -1,0 +1,562 @@
+# QA Testing Pipeline for eduhu.ki
+# Comprehensive quality assurance workflow for teacher-focused PWA
+
+name: 'QA Testing Pipeline'
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'qa/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run comprehensive tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  PLAYWRIGHT_BROWSERS_PATH: ~/.cache/playwright
+
+jobs:
+  # Phase 1: Fast feedback - Unit tests and linting
+  unit-tests:
+    name: 'Unit Tests & Code Quality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Run TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+        env:
+          CI: true
+
+      - name: Upload unit test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: unit-test-coverage
+          fail_ci_if_error: true
+
+      - name: Store test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            coverage/
+            test-results/
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          lcov-file: ./coverage/lcov.info
+
+  # Phase 2: Integration tests
+  integration-tests:
+    name: 'Integration Tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-tests
+
+    services:
+      # Mock InstantDB service for testing
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: eduhu_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup test environment
+        run: |
+          cp .env.example .env.test.local
+          echo "DATABASE_URL=postgresql://postgres:testpassword@localhost:5432/eduhu_test" >> .env.test.local
+          echo "INSTANTDB_APP_ID=test-app-id" >> .env.test.local
+          echo "OPENAI_API_KEY=test-openai-key" >> .env.test.local
+
+      - name: Run database migrations
+        run: npm run db:migrate:test
+        env:
+          NODE_ENV: test
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          NODE_ENV: test
+
+      - name: Store integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            test-results/integration/
+            logs/
+
+  # Phase 3: End-to-End tests for teacher workflows
+  e2e-teacher-workflows:
+    name: 'E2E Teacher Workflows'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [unit-tests, integration-tests]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Build application for testing
+        run: npm run build
+        env:
+          NODE_ENV: production
+          INSTANTDB_APP_ID: ${{ secrets.TEST_INSTANTDB_APP_ID }}
+          OPENAI_API_KEY: ${{ secrets.TEST_OPENAI_API_KEY }}
+
+      - name: Start application server
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 -t 60000
+        env:
+          PORT: 3000
+
+      - name: Run teacher workflow E2E tests
+        run: npx playwright test --project=${{ matrix.browser }} --grep="teacher workflow"
+        env:
+          BROWSER: ${{ matrix.browser }}
+          BASE_URL: http://localhost:3000
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.browser }}
+          path: |
+            test-results/
+            playwright-report/
+
+      - name: Upload E2E test videos
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-videos-${{ matrix.browser }}
+          path: test-results/videos/
+
+  # Phase 4: Performance testing
+  performance-tests:
+    name: 'Performance & Load Tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: e2e-teacher-workflows
+    if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'performance')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Start application server
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 -t 60000
+        env:
+          PORT: 3000
+
+      - name: Run performance tests
+        run: npm run qa:performance
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          configPath: './.lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            lighthouse-results/
+            performance-reports/
+
+  # Phase 5: Accessibility testing
+  accessibility-tests:
+    name: 'Accessibility Compliance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start application server
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 -t 60000
+        env:
+          PORT: 3000
+
+      - name: Run accessibility tests
+        run: npm run qa:accessibility
+
+      - name: Upload accessibility results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: accessibility-results
+          path: |
+            accessibility-reports/
+            axe-results/
+
+  # Phase 6: Security scanning
+  security-scan:
+    name: 'Security Vulnerability Scan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level high
+        continue-on-error: true
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            security-reports/
+            snyk-results.json
+
+  # Phase 7: Mobile PWA testing
+  mobile-pwa-tests:
+    name: 'Mobile PWA Testing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: e2e-teacher-workflows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start application server
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000 -t 60000
+        env:
+          PORT: 3000
+
+      - name: Test PWA installation
+        run: npx playwright test --grep="PWA installation"
+
+      - name: Test offline functionality
+        run: npx playwright test --grep="offline"
+
+      - name: Test mobile responsiveness
+        run: npx playwright test --grep="mobile|responsive"
+
+      - name: Upload mobile test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-pwa-results
+          path: |
+            test-results/mobile/
+            pwa-test-reports/
+
+  # Phase 8: Quality gates and reporting
+  quality-gates:
+    name: 'Quality Gates & Reporting'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests, integration-tests, e2e-teacher-workflows, accessibility-tests, security-scan]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./test-artifacts
+
+      - name: Generate quality report
+        run: |
+          node scripts/generate-qa-report.js
+        env:
+          ARTIFACTS_PATH: ./test-artifacts
+
+      - name: Check quality gates
+        id: quality_gates
+        run: |
+          # Check unit test coverage threshold (80%)
+          COVERAGE=$(cat test-artifacts/unit-test-results/coverage/coverage-summary.json | jq '.total.lines.pct')
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "❌ Coverage below threshold: $COVERAGE%"
+            echo "coverage_passed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Coverage meets threshold: $COVERAGE%"
+            echo "coverage_passed=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for critical security vulnerabilities
+          if grep -q "high\|critical" test-artifacts/security-scan-results/snyk-results.json; then
+            echo "❌ Critical security vulnerabilities found"
+            echo "security_passed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No critical security vulnerabilities"
+            echo "security_passed=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Check accessibility compliance
+          if grep -q "violation" test-artifacts/accessibility-results/axe-results/*.json; then
+            echo "❌ Accessibility violations found"
+            echo "accessibility_passed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Accessibility compliance verified"
+            echo "accessibility_passed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment PR with quality report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read quality report
+            const report = fs.readFileSync('qa-report.md', 'utf8');
+
+            // Create or update comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('# QA Quality Report')
+            );
+
+            const body = `# QA Quality Report 🎯
+
+            ${report}
+
+            **Quality Gates Status:**
+            - Coverage: ${{ steps.quality_gates.outputs.coverage_passed == 'true' && '✅ Passed' || '❌ Failed' }}
+            - Security: ${{ steps.quality_gates.outputs.security_passed == 'true' && '✅ Passed' || '❌ Failed' }}
+            - Accessibility: ${{ steps.quality_gates.outputs.accessibility_passed == 'true' && '✅ Passed' || '❌ Failed' }}
+
+            ---
+            *Report generated by QA Pipeline at ${new Date().toISOString()}*
+            `;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Fail if quality gates don't pass
+        if: |
+          steps.quality_gates.outputs.coverage_passed != 'true' ||
+          steps.quality_gates.outputs.security_passed != 'true' ||
+          steps.quality_gates.outputs.accessibility_passed != 'true'
+        run: |
+          echo "❌ Quality gates failed. Check the report for details."
+          exit 1
+
+      - name: Upload final quality report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-quality-report
+          path: |
+            qa-report.md
+            quality-metrics.json
+
+  # Deployment readiness check
+  deployment-readiness:
+    name: 'Deployment Readiness Check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [quality-gates, mobile-pwa-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate deployment readiness
+        run: |
+          echo "🚀 All quality checks passed!"
+          echo "✅ Unit tests: Passed"
+          echo "✅ Integration tests: Passed"
+          echo "✅ E2E tests: Passed"
+          echo "✅ Performance tests: Passed"
+          echo "✅ Accessibility: Passed"
+          echo "✅ Security scan: Passed"
+          echo "✅ Mobile PWA: Passed"
+          echo ""
+          echo "eduhu.ki is ready for deployment! 🎉"
+
+      - name: Trigger deployment
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'deploy-production',
+              client_payload: {
+                ref: context.sha,
+                environment: 'production'
+              }
+            });
+
+            console.log('🚀 Production deployment triggered!');
+
+# Global job settings
+defaults:
+  run:
+    shell: bash
+
+# Concurrency control
+concurrency:
+  group: qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

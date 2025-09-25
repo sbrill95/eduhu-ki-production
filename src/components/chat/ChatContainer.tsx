@@ -6,7 +6,7 @@ import ChatInput from './ChatInput'
 import {
   useMessages,
   addMessage,
-  createChat,
+  createChatSession,
   DatabaseError,
   monitorQueryPerformance,
   useChatWithMessages
@@ -15,19 +15,27 @@ import { sortMessagesByTimestamp } from '@/lib/database'
 import type { Message } from '@/lib/instant'
 import { startMetricsCollection, PerformanceMonitor } from '@/lib/metrics'
 import { CacheManager } from '@/lib/cache'
+import crypto from 'crypto'
 
 interface ChatContainerProps {
-  chatId: string
+  sessionId: string
 }
 
-export default function ChatContainer({ chatId }: ChatContainerProps) {
+// Extended message interface with file attachments
+interface MessageWithAttachments extends Message {
+  fileAttachments?: string[]
+  attachments?: any[] // FileUpload objects
+}
+
+export default function ChatContainer({ sessionId }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [currentChatId, setCurrentChatId] = useState(chatId)
+  const [currentChatId, setCurrentChatId] = useState(sessionId)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [streamingContent, setStreamingContent] = useState('')
   const [requestStartTime, setRequestStartTime] = useState<number>(0)
+  const [messagesWithAttachments, setMessagesWithAttachments] = useState<MessageWithAttachments[]>([])
 
   // Initialize metrics collection on component mount
   useEffect(() => {
@@ -45,7 +53,32 @@ export default function ChatContainer({ chatId }: ChatContainerProps) {
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }, [messagesWithAttachments, streamingContent])
+
+  // Fetch file attachments for messages
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      if (!messages.length) {
+        setMessagesWithAttachments([])
+        return
+      }
+
+      const messagesWithFiles = await Promise.all(
+        messages.map(async (message: Message) => {
+          // For now, we'll simulate file attachments since the database query needs to be implemented
+          // In a real implementation, you would query the file_uploads table by message_id
+          return {
+            ...message,
+            attachments: [] // Empty for now, would be populated from database query
+          } as MessageWithAttachments
+        })
+      )
+
+      setMessagesWithAttachments(messagesWithFiles)
+    }
+
+    fetchAttachments()
+  }, [messages])
 
   // Create chat if it doesn't exist
   useEffect(() => {
@@ -54,7 +87,7 @@ export default function ChatContainer({ chatId }: ChatContainerProps) {
     }
   }, [currentChatId, messagesData, messagesError])
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, files?: File[]) => {
     if (isLoading) return // Prevent sending while already processing
 
     setError(null)
@@ -65,30 +98,67 @@ export default function ChatContainer({ chatId }: ChatContainerProps) {
       // Create chat if needed
       if (!activeChatId || messagesError) {
         const title = content.length > 50 ? content.substring(0, 50) + '...' : content
-        activeChatId = await createChat(title)
+        const teacherId = 'demo-teacher-' + crypto.randomUUID().substring(0, 8); activeChatId = await createChatSession(teacherId, title)
         setCurrentChatId(activeChatId)
+      }
+
+      // Handle file uploads first if present
+      let uploadedFileIds: string[] = []
+      if (files && files.length > 0) {
+        const uploadPromises = files.map(async (file) => {
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('teacherId', 'demo-teacher-' + crypto.randomUUID().substring(0, 8))
+          formData.append('sessionId', activeChatId)
+
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload ${file.name}`)
+          }
+
+          const uploadResult = await uploadResponse.json()
+          return uploadResult.fileId
+        })
+
+        uploadedFileIds = await Promise.all(uploadPromises)
       }
 
       // 1. Save user message to database with enhanced tracking
       const userMessageId = await addMessage(activeChatId, content, 'user', {
-        contentType: 'text',
+        contentType: files && files.length > 0 ? 'file_attachment' : 'text',
         tokenCount: content.length, // Rough approximation
-        educationalTopics: extractEducationalTopics(content)
+        educationalTopics: extractEducationalTopics(content),
+        fileAttachments: uploadedFileIds
       })
 
       setRequestStartTime(Date.now())
 
       // 2. Prepare message history for API
       const allMessages = messages.length > 0 ? messages : []
-      const currentMessages = [...allMessages, { id: userMessageId, chat_id: activeChatId, content, role: 'user' as const, timestamp: Date.now() }]
+      const newUserMessage = { id: userMessageId, chat_id: activeChatId, content, role: 'user' as const, timestamp: Date.now(), fileAttachments: uploadedFileIds }
+      const currentMessages = [...allMessages, newUserMessage]
 
       // Format for OpenAI API (only recent messages to stay under token limits)
       const recentMessages = currentMessages
         .slice(-10) // Keep last 10 messages for context
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))
+        .map(msg => {
+          let messageContent = msg.content
+
+          // Add file information to message content if files are attached
+          if (msg.fileAttachments && msg.fileAttachments.length > 0) {
+            const fileInfo = `\n\n[Files attached: ${msg.fileAttachments.length} file(s)]`
+            messageContent = messageContent + fileInfo
+          }
+
+          return {
+            role: msg.role,
+            content: messageContent
+          }
+        })
 
       // 3. Initialize streaming state
       setStreamingContent('')
@@ -261,7 +331,7 @@ export default function ChatContainer({ chatId }: ChatContainerProps) {
           </div>
         ) : (
           <>
-            {messages.map((message) => (
+            {messagesWithAttachments.map((message) => (
               <ChatMessage
                 key={message.id}
                 id={message.id}
@@ -269,6 +339,7 @@ export default function ChatContainer({ chatId }: ChatContainerProps) {
                 role={message.role}
                 timestamp={message.timestamp}
                 isStreaming={false}
+                attachments={message.attachments || []}
               />
             ))}
             {/* Show streaming message */}

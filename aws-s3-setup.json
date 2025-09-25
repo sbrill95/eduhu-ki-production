@@ -1,0 +1,388 @@
+{
+  "cloudFormationTemplate": {
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "AWS S3 Storage Setup for eduhu.ki Educational Platform",
+    "Parameters": {
+      "EnvironmentName": {
+        "Type": "String",
+        "Default": "production",
+        "AllowedValues": ["production", "staging", "development"],
+        "Description": "Environment name for resource naming"
+      },
+      "ProjectName": {
+        "Type": "String",
+        "Default": "eduhu",
+        "Description": "Project name for resource naming"
+      }
+    },
+    "Resources": {
+      "FileStorageBucket": {
+        "Type": "AWS::S3::Bucket",
+        "Properties": {
+          "BucketName": {
+            "Fn::Sub": "${ProjectName}-files-${EnvironmentName}"
+          },
+          "BucketEncryption": {
+            "ServerSideEncryptionConfiguration": [
+              {
+                "ServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                }
+              }
+            ]
+          },
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "BlockPublicPolicy": true,
+            "IgnorePublicAcls": true,
+            "RestrictPublicBuckets": true
+          },
+          "CorsConfiguration": {
+            "CorsRules": [
+              {
+                "AllowedHeaders": ["*"],
+                "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+                "AllowedOrigins": [
+                  "https://*.vercel.app",
+                  "https://eduhu.ki",
+                  "https://*.eduhu.ki"
+                ],
+                "ExposedHeaders": ["ETag", "x-amz-meta-*"],
+                "MaxAge": 3600
+              }
+            ]
+          },
+          "LifecycleConfiguration": {
+            "Rules": [
+              {
+                "Id": "DeleteIncompleteMultipartUploads",
+                "Status": "Enabled",
+                "AbortIncompleteMultipartUpload": {
+                  "DaysAfterInitiation": 7
+                }
+              },
+              {
+                "Id": "TransitionToIA",
+                "Status": "Enabled",
+                "Transition": {
+                  "Days": 30,
+                  "StorageClass": "STANDARD_IA"
+                }
+              },
+              {
+                "Id": "DeleteTempFiles",
+                "Status": "Enabled",
+                "Filter": {
+                  "Prefix": "temp/"
+                },
+                "Expiration": {
+                  "Days": 7
+                }
+              }
+            ]
+          },
+          "NotificationConfiguration": {
+            "LambdaConfigurations": [
+              {
+                "Event": "s3:ObjectCreated:*",
+                "Function": {
+                  "Ref": "FileProcessingLambda"
+                },
+                "Filter": {
+                  "S3Key": {
+                    "Rules": [
+                      {
+                        "Name": "prefix",
+                        "Value": "uploads/"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "VersioningConfiguration": {
+            "Status": "Suspended"
+          }
+        }
+      },
+      "BackupBucket": {
+        "Type": "AWS::S3::Bucket",
+        "Condition": "IsProduction",
+        "Properties": {
+          "BucketName": {
+            "Fn::Sub": "${ProjectName}-backups-${EnvironmentName}"
+          },
+          "BucketEncryption": {
+            "ServerSideEncryptionConfiguration": [
+              {
+                "ServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                }
+              }
+            ]
+          },
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "BlockPublicPolicy": true,
+            "IgnorePublicAcls": true,
+            "RestrictPublicBuckets": true
+          },
+          "LifecycleConfiguration": {
+            "Rules": [
+              {
+                "Id": "BackupRetention",
+                "Status": "Enabled",
+                "Expiration": {
+                  "Days": 90
+                },
+                "Transition": {
+                  "Days": 30,
+                  "StorageClass": "GLACIER"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "FileProcessingLambda": {
+        "Type": "AWS::Lambda::Function",
+        "Properties": {
+          "FunctionName": {
+            "Fn::Sub": "${ProjectName}-file-processing-${EnvironmentName}"
+          },
+          "Runtime": "nodejs18.x",
+          "Handler": "index.handler",
+          "Role": {
+            "Fn::GetAtt": ["LambdaExecutionRole", "Arn"]
+          },
+          "Code": {
+            "ZipFile": "const AWS = require('aws-sdk');\nconst s3 = new AWS.S3();\n\nexports.handler = async (event) => {\n    console.log('File processing event:', JSON.stringify(event, null, 2));\n    \n    for (const record of event.Records) {\n        const bucket = record.s3.bucket.name;\n        const key = record.s3.object.key;\n        \n        console.log(`Processing file: ${bucket}/${key}`);\n        \n        // Add your file processing logic here\n        // - Generate thumbnails for images\n        // - Validate file types\n        // - Update database records\n        // - Send notifications\n    }\n    \n    return { statusCode: 200, body: 'File processing completed' };\n};"
+          },
+          "Environment": {
+            "Variables": {
+              "ENVIRONMENT": {
+                "Ref": "EnvironmentName"
+              },
+              "BUCKET_NAME": {
+                "Ref": "FileStorageBucket"
+              }
+            }
+          },
+          "Timeout": 300,
+          "MemorySize": 512
+        }
+      },
+      "LambdaExecutionRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "RoleName": {
+            "Fn::Sub": "${ProjectName}-lambda-execution-${EnvironmentName}"
+          },
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          },
+          "ManagedPolicyArns": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          ],
+          "Policies": [
+            {
+              "PolicyName": "S3Access",
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:GetObject",
+                      "s3:PutObject",
+                      "s3:DeleteObject"
+                    ],
+                    "Resource": [
+                      {
+                        "Fn::Sub": "${FileStorageBucket}/*"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "ApplicationUser": {
+        "Type": "AWS::IAM::User",
+        "Properties": {
+          "UserName": {
+            "Fn::Sub": "${ProjectName}-app-user-${EnvironmentName}"
+          },
+          "Policies": [
+            {
+              "PolicyName": "S3FileStorageAccess",
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Sid": "ListBucketContents",
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:ListBucket"
+                    ],
+                    "Resource": [
+                      {
+                        "Fn::GetAtt": ["FileStorageBucket", "Arn"]
+                      }
+                    ],
+                    "Condition": {
+                      "StringLike": {
+                        "s3:prefix": ["uploads/*", "thumbnails/*"]
+                      }
+                    }
+                  },
+                  {
+                    "Sid": "FileOperations",
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:GetObject",
+                      "s3:GetObjectAcl",
+                      "s3:PutObject",
+                      "s3:PutObjectAcl",
+                      "s3:DeleteObject",
+                      "s3:AbortMultipartUpload",
+                      "s3:ListMultipartUploadParts"
+                    ],
+                    "Resource": [
+                      {
+                        "Fn::Sub": "${FileStorageBucket}/uploads/*"
+                      },
+                      {
+                        "Fn::Sub": "${FileStorageBucket}/thumbnails/*"
+                      },
+                      {
+                        "Fn::Sub": "${FileStorageBucket}/temp/*"
+                      }
+                    ]
+                  },
+                  {
+                    "Sid": "GeneratePresignedUrls",
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:GetObject"
+                    ],
+                    "Resource": [
+                      {
+                        "Fn::Sub": "${FileStorageBucket}/*"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "ApplicationUserAccessKey": {
+        "Type": "AWS::IAM::AccessKey",
+        "Properties": {
+          "UserName": {
+            "Ref": "ApplicationUser"
+          }
+        }
+      },
+      "LambdaInvokePermission": {
+        "Type": "AWS::Lambda::Permission",
+        "Properties": {
+          "FunctionName": {
+            "Ref": "FileProcessingLambda"
+          },
+          "Action": "lambda:InvokeFunction",
+          "Principal": "s3.amazonaws.com",
+          "SourceArn": {
+            "Fn::GetAtt": ["FileStorageBucket", "Arn"]
+          }
+        }
+      }
+    },
+    "Conditions": {
+      "IsProduction": {
+        "Fn::Equals": [
+          {
+            "Ref": "EnvironmentName"
+          },
+          "production"
+        ]
+      }
+    },
+    "Outputs": {
+      "BucketName": {
+        "Description": "Name of the created S3 bucket",
+        "Value": {
+          "Ref": "FileStorageBucket"
+        },
+        "Export": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-BucketName"
+          }
+        }
+      },
+      "BucketArn": {
+        "Description": "ARN of the created S3 bucket",
+        "Value": {
+          "Fn::GetAtt": ["FileStorageBucket", "Arn"]
+        }
+      },
+      "AccessKeyId": {
+        "Description": "Access Key ID for the application user",
+        "Value": {
+          "Ref": "ApplicationUserAccessKey"
+        }
+      },
+      "SecretAccessKey": {
+        "Description": "Secret Access Key for the application user",
+        "Value": {
+          "Fn::GetAtt": ["ApplicationUserAccessKey", "SecretAccessKey"]
+        },
+        "Export": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-SecretAccessKey"
+          }
+        }
+      },
+      "Region": {
+        "Description": "AWS Region",
+        "Value": {
+          "Ref": "AWS::Region"
+        }
+      }
+    }
+  },
+  "deploymentInstructions": {
+    "prerequisites": [
+      "AWS CLI configured with appropriate permissions",
+      "CloudFormation deployment permissions",
+      "S3 bucket creation permissions"
+    ],
+    "deploymentCommands": [
+      "# Deploy the CloudFormation stack",
+      "aws cloudformation deploy --template-file aws-s3-setup.json --stack-name eduhu-storage-production --parameter-overrides EnvironmentName=production ProjectName=eduhu --capabilities CAPABILITY_NAMED_IAM",
+      "",
+      "# Get the outputs (access keys and bucket name)",
+      "aws cloudformation describe-stacks --stack-name eduhu-storage-production --query 'Stacks[0].Outputs'"
+    ],
+    "postDeployment": [
+      "1. Note down the AccessKeyId and SecretAccessKey from the stack outputs",
+      "2. Add these to your Vercel environment variables",
+      "3. Set the BucketName in your environment variables",
+      "4. Test the S3 integration using the test script"
+    ]
+  }
+}

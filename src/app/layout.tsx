@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import PWASetup from '@/components/PWASetup'
+import AppLayout from '@/components/layout/AppLayout'
 
 export const metadata: Metadata = {
   title: 'eduhu.ki - Teacher AI Assistant',
@@ -25,9 +26,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <PWASetup />
-        <div className="h-screen flex flex-col">
+        <AppLayout>
           {children}
-        </div>
+        </AppLayout>
       </body>
     </html>
   )

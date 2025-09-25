@@ -1,0 +1,320 @@
+{
+  "terraformConfiguration": {
+    "terraform": {
+      "required_providers": {
+        "cloudflare": {
+          "source": "cloudflare/cloudflare",
+          "version": "~> 4.0"
+        }
+      }
+    },
+    "provider": {
+      "cloudflare": {
+        "api_token": "${var.cloudflare_api_token}"
+      }
+    },
+    "variable": {
+      "cloudflare_api_token": {
+        "description": "CloudFlare API Token with R2 permissions",
+        "type": "string",
+        "sensitive": true
+      },
+      "account_id": {
+        "description": "CloudFlare Account ID",
+        "type": "string"
+      },
+      "environment": {
+        "description": "Environment name",
+        "type": "string",
+        "default": "production"
+      },
+      "project_name": {
+        "description": "Project name for resource naming",
+        "type": "string",
+        "default": "eduhu"
+      }
+    },
+    "resource": {
+      "cloudflare_r2_bucket": {
+        "file_storage_bucket": {
+          "account_id": "${var.account_id}",
+          "name": "${var.project_name}-files-${var.environment}",
+          "location": "ENAM"
+        },
+        "backup_bucket": {
+          "count": "${var.environment == \"production\" ? 1 : 0}",
+          "account_id": "${var.account_id}",
+          "name": "${var.project_name}-backups-${var.environment}",
+          "location": "ENAM"
+        }
+      }
+    },
+    "output": {
+      "bucket_name": {
+        "description": "Name of the R2 storage bucket",
+        "value": "${cloudflare_r2_bucket.file_storage_bucket.name}"
+      },
+      "account_id": {
+        "description": "CloudFlare Account ID",
+        "value": "${var.account_id}"
+      },
+      "endpoint": {
+        "description": "R2 endpoint URL",
+        "value": "https://${var.account_id}.r2.cloudflarestorage.com"
+      },
+      "public_url": {
+        "description": "Public R2 URL for files",
+        "value": "https://pub-${cloudflare_r2_bucket.file_storage_bucket.name}.r2.dev"
+      }
+    }
+  },
+  "manualSetupInstructions": {
+    "prerequisites": [
+      "CloudFlare account with R2 enabled",
+      "CloudFlare API token with R2:Edit permissions",
+      "Account ID from CloudFlare dashboard"
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "title": "Create R2 Bucket",
+        "description": "Create the main file storage bucket",
+        "via_dashboard": [
+          "1. Go to R2 Object Storage in CloudFlare dashboard",
+          "2. Click 'Create bucket'",
+          "3. Name: eduhu-files-production",
+          "4. Location: Eastern North America (ENAM)",
+          "5. Click 'Create bucket'"
+        ],
+        "via_api": {
+          "method": "PUT",
+          "url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/eduhu-files-production",
+          "headers": {
+            "Authorization": "Bearer {api_token}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "eduhu-files-production",
+            "defaultStorageClass": "Standard"
+          }
+        }
+      },
+      {
+        "step": 2,
+        "title": "Configure CORS",
+        "description": "Set up CORS policy for the bucket",
+        "via_api": {
+          "method": "PUT",
+          "url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/eduhu-files-production/cors",
+          "headers": {
+            "Authorization": "Bearer {api_token}",
+            "Content-Type": "application/json"
+          },
+          "body": [
+            {
+              "AllowedOrigins": [
+                "https://eduhu.ki",
+                "https://*.eduhu.ki",
+                "https://*.vercel.app"
+              ],
+              "AllowedMethods": [
+                "GET",
+                "PUT",
+                "POST",
+                "DELETE",
+                "HEAD"
+              ],
+              "AllowedHeaders": [
+                "*"
+              ],
+              "ExposedHeaders": [
+                "ETag"
+              ],
+              "MaxAge": 3600
+            }
+          ]
+        }
+      },
+      {
+        "step": 3,
+        "title": "Create API Token",
+        "description": "Create API token for application access",
+        "via_dashboard": [
+          "1. Go to My Profile → API Tokens",
+          "2. Click 'Create Token'",
+          "3. Use 'Custom token' template",
+          "4. Permissions:",
+          "   - Account: Cloudflare R2:Edit",
+          "   - Zone Resources: Include - All zones from account",
+          "5. Account Resources: Include - {your_account}",
+          "6. Click 'Continue to summary'",
+          "7. Click 'Create Token'",
+          "8. Copy the token (R2_ACCESS_KEY_ID equivalent)"
+        ]
+      },
+      {
+        "step": 4,
+        "title": "Create API Secret",
+        "description": "Create API secret for application access",
+        "via_dashboard": [
+          "1. In R2 dashboard, go to 'Manage R2 API tokens'",
+          "2. Click 'Create API token'",
+          "3. Token name: eduhu-production-access",
+          "4. Permissions: Read & Write",
+          "5. TTL: No expiry (or set as needed)",
+          "6. Click 'Create API token'",
+          "7. Copy Access Key ID and Secret Access Key"
+        ]
+      },
+      {
+        "step": 5,
+        "title": "Set Up Custom Domain (Optional)",
+        "description": "Configure custom domain for R2 bucket",
+        "via_dashboard": [
+          "1. In R2 bucket settings, go to 'Settings' tab",
+          "2. Click 'Connect Domain'",
+          "3. Enter your custom domain (e.g., files.eduhu.ki)",
+          "4. Follow DNS setup instructions",
+          "5. Wait for DNS propagation"
+        ]
+      }
+    ]
+  },
+  "configurationTemplates": {
+    "corsPolicy": [
+      {
+        "AllowedOrigins": [
+          "https://eduhu.ki",
+          "https://*.eduhu.ki",
+          "https://*.vercel.app"
+        ],
+        "AllowedMethods": [
+          "GET",
+          "PUT",
+          "POST",
+          "DELETE",
+          "HEAD"
+        ],
+        "AllowedHeaders": [
+          "*"
+        ],
+        "ExposedHeaders": [
+          "ETag",
+          "x-amz-meta-*"
+        ],
+        "MaxAge": 3600
+      },
+      {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET"],
+        "AllowedHeaders": [
+          "Authorization",
+          "Content-Type"
+        ],
+        "MaxAge": 86400
+      }
+    ],
+    "lifecycleRules": [
+      {
+        "id": "delete-temp-files",
+        "status": "Enabled",
+        "filter": {
+          "prefix": "temp/"
+        },
+        "expiration": {
+          "days": 7
+        }
+      },
+      {
+        "id": "cleanup-multipart-uploads",
+        "status": "Enabled",
+        "abortIncompleteMultipartUpload": {
+          "daysAfterInitiation": 7
+        }
+      }
+    ]
+  },
+  "environmentVariables": {
+    "production": {
+      "R2_ACCESS_KEY_ID": "your-r2-access-key-id-here",
+      "R2_SECRET_ACCESS_KEY": "your-r2-secret-access-key-here",
+      "R2_BUCKET_NAME": "eduhu-files-production",
+      "R2_ACCOUNT_ID": "your-cloudflare-account-id-here",
+      "R2_ENDPOINT": "https://your-account-id.r2.cloudflarestorage.com",
+      "STORAGE_PROVIDER": "r2"
+    },
+    "staging": {
+      "R2_ACCESS_KEY_ID": "your-r2-staging-access-key-id-here",
+      "R2_SECRET_ACCESS_KEY": "your-r2-staging-secret-access-key-here",
+      "R2_BUCKET_NAME": "eduhu-files-staging",
+      "R2_ACCOUNT_ID": "your-cloudflare-account-id-here",
+      "R2_ENDPOINT": "https://your-account-id.r2.cloudflarestorage.com",
+      "STORAGE_PROVIDER": "r2"
+    }
+  },
+  "vercelDeploymentConfig": {
+    "vercelSecrets": [
+      {
+        "name": "R2_ACCESS_KEY_ID",
+        "environment": ["production", "preview"],
+        "description": "CloudFlare R2 Access Key ID"
+      },
+      {
+        "name": "R2_SECRET_ACCESS_KEY",
+        "environment": ["production", "preview"],
+        "description": "CloudFlare R2 Secret Access Key"
+      },
+      {
+        "name": "R2_ACCOUNT_ID",
+        "environment": ["production", "preview", "development"],
+        "description": "CloudFlare Account ID"
+      }
+    ],
+    "vercelEnvironmentVariables": [
+      {
+        "name": "R2_BUCKET_NAME",
+        "value": "eduhu-files-production",
+        "environment": ["production"]
+      },
+      {
+        "name": "R2_BUCKET_NAME",
+        "value": "eduhu-files-staging",
+        "environment": ["preview"]
+      },
+      {
+        "name": "STORAGE_PROVIDER",
+        "value": "r2",
+        "environment": ["production", "preview"]
+      }
+    ]
+  },
+  "testingConfiguration": {
+    "connectionTest": {
+      "endpoint": "https://{account_id}.r2.cloudflarestorage.com",
+      "testFile": "test-connection.txt",
+      "testContent": "R2 connection test",
+      "expectedResponse": "200 OK"
+    },
+    "uploadTest": {
+      "testFile": "uploads/test/sample.txt",
+      "testContent": "Sample file for R2 upload test",
+      "expectedPublicUrl": "https://pub-{bucket_name}.r2.dev/uploads/test/sample.txt"
+    }
+  },
+  "securityRecommendations": [
+    "Use separate buckets for different environments",
+    "Implement bucket-level access policies",
+    "Enable CloudFlare Access for additional security",
+    "Use signed URLs for sensitive file access",
+    "Regularly rotate API tokens",
+    "Monitor access logs and set up alerts",
+    "Enable R2 event notifications for file operations"
+  ],
+  "costOptimization": [
+    "Use lifecycle rules to manage object transitions",
+    "Implement proper caching headers",
+    "Consider using CloudFlare CDN for frequently accessed files",
+    "Monitor storage usage and set up alerts",
+    "Use R2's egress-free data transfer advantage"
+  ]
+}

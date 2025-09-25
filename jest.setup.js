@@ -14,23 +14,27 @@ global.ResizeObserver = jest.fn().mockImplementation(() => ({
   disconnect: jest.fn(),
 }))
 
-// Mock window.matchMedia for responsive design tests
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-})
+// Mock window.matchMedia for responsive design tests (only in jsdom environment)
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(), // deprecated
+      removeListener: jest.fn(), // deprecated
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  })
+}
 
-// Mock window.scrollTo for tests
-global.scrollTo = jest.fn()
+// Mock window.scrollTo for tests (only in jsdom environment)
+if (typeof global.scrollTo === 'undefined') {
+  global.scrollTo = jest.fn()
+}
 
 // Suppress console.log in tests unless VERBOSE_TESTS is set
 if (!process.env.VERBOSE_TESTS) {
@@ -42,12 +46,14 @@ if (!process.env.VERBOSE_TESTS) {
   }
 }
 
-// Mock Service Worker for PWA tests
-global.navigator.serviceWorker = {
-  register: jest.fn(() => Promise.resolve()),
-  ready: Promise.resolve({
-    unregister: jest.fn(() => Promise.resolve()),
-  }),
+// Mock Service Worker for PWA tests (only in browser environment)
+if (typeof navigator !== 'undefined' && navigator) {
+  global.navigator.serviceWorker = {
+    register: jest.fn(() => Promise.resolve()),
+    ready: Promise.resolve({
+      unregister: jest.fn(() => Promise.resolve()),
+    }),
+  }
 }
 
 // Set up fake timers by default (can be overridden in individual tests)
