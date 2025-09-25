@@ -297,6 +297,7 @@ export interface Message {
   quality_score?: number
   parent_message_id?: string
   edit_history?: Array<{ content: string; timestamp: number }>
+  fileAttachments?: string[]
 }
 
 export interface Artifact {
