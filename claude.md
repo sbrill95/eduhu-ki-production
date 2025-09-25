@@ -19,6 +19,59 @@ eduhu.ki is a Progressive Web App designed specifically for teachers, providing 
 - `agents/frontend-specialist.md` - Frontend expert (Next.js, PWA, UI/UX)
 - `agents/backend-specialist.md` - Backend expert (InstantDB, APIs, data models)
 
+## TypeScript & Build Verification
+
+### Pre-Deployment Checklist
+**ALWAYS** run these commands before committing/pushing:
+
+```bash
+# 1. Verify build locally
+npm run verify-build
+
+# 2. If build fails, fix errors before proceeding
+# 3. Only commit after verification passes
+git add .
+git commit -m "your message"
+git push
+```
+
+### Common TypeScript Error Patterns
+
+1. **Missing Property Errors**
+   - When adding new properties to function parameters
+   - **Fix**: Update both function signature AND interface/type definition
+   - **Example**: Adding `fileAttachments` requires updating both `addMessage` options AND implementation
+
+2. **Type Import Issues**
+   - Node.js modules don't have default exports
+   - **Fix**: Use `import * as moduleName from 'module'` instead of `import moduleName from 'module'`
+   - **Common modules**: crypto, path, fs
+
+3. **Enum/Union Type Mismatches**
+   - Adding new values to contentType enums
+   - **Fix**: Update ALL type definitions in the chain, not just the first one
+
+### Verification Commands
+
+```bash
+# Quick TypeScript check (fastest)
+npx tsc --noEmit --skipLibCheck
+
+# Full build verification (comprehensive)
+npm run verify-build
+
+# Manual build (what Vercel runs)
+npm run build
+```
+
+### Emergency Fix Workflow
+If deployment fails:
+1. **DON'T** push another "fix" without local verification
+2. Run `npm run verify-build` locally
+3. Fix ALL errors shown
+4. Re-run verification until it passes
+5. THEN commit and push
+
 ## Core Features (MVP)
 1. **Chat Interface** - Simple, clean AI chat for teachers
 2. **Personalized Home Feed** - Curated content and recent activity

@@ -28,6 +28,8 @@
     "qa:mobile": "playwright test --grep='mobile|responsive|PWA'",
     "qa:full": "npm run qa:check && npm run qa:performance && npm run qa:accessibility && npm run qa:security && npm run qa:mobile",
     "test:security": "jest --testPathPattern=tests/security/",
+    "verify-build": "node scripts/verify-build.js",
+    "pre-commit": "npm run verify-build",
     "test:performance": "playwright test tests/performance/",
     "test:chat-sessions": "playwright test tests/integration/chat-sessions.test.ts",
     "test:file-upload": "playwright test tests/performance/file-upload.test.ts",
