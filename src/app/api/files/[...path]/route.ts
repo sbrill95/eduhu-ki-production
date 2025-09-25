@@ -13,15 +13,17 @@ import { validateSessionAccess } from '@/lib/database'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const startTime = Date.now()
   let teacherId: string | null = null
   let fileRecord: any = null
 
   try {
+    // Await params in Next.js 15
+    const resolvedParams = await params
     // Construct file path from URL parameters
-    const filePath = params.path.join('/')
+    const filePath = resolvedParams.path.join('/')
 
     if (!filePath) {
       return NextResponse.json(
