@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
         if (fileQuery.data?.file_uploads) {
           processedFileAttachments = Object.values(fileQuery.data.file_uploads)
-            .filter(file => file.processing_status === 'completed')
+            .filter((file: any) => file.processing_status === 'completed')
         }
 
         console.log(`Processed ${processedFileAttachments.length} file attachments for chat`)
