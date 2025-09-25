@@ -1,8 +1,19 @@
 import { FILE_UPLOAD_CONFIG } from '@/lib/instant'
 import { saveThumbnailToCloudStorage } from '@/lib/file-storage'
-import { createCanvas, loadImage } from 'canvas'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse'
+
+// Optional canvas import for thumbnail generation
+let createCanvas: any = null
+let loadImage: any = null
+
+try {
+  const canvas = require('canvas')
+  createCanvas = canvas.createCanvas
+  loadImage = canvas.loadImage
+} catch (error) {
+  console.warn('Canvas not available - thumbnail generation disabled:', error.message)
+}
 
 export interface FileProcessingResult {
   success: boolean
@@ -113,58 +124,65 @@ async function processImage(
     const blob = new Blob([buffer], { type: mimeType })
     const imageUrl = URL.createObjectURL(blob)
 
-    try {
-      // Load image using canvas (Node.js environment)
-      const image = await loadImage(buffer)
-
-      metadata.originalWidth = image.width
-      metadata.originalHeight = image.height
-      metadata.aspectRatio = image.width / image.height
-
-      // Generate thumbnail
-      const { width: thumbWidth, height: thumbHeight } = FILE_UPLOAD_CONFIG.THUMBNAIL_SIZE
-
-      // Calculate dimensions maintaining aspect ratio
-      let finalWidth = thumbWidth
-      let finalHeight = thumbHeight
-
-      if (image.width > image.height) {
-        finalHeight = Math.round((thumbWidth / image.width) * image.height)
-      } else {
-        finalWidth = Math.round((thumbHeight / image.height) * image.width)
-      }
-
-      // Create thumbnail canvas
-      const canvas = createCanvas(finalWidth, finalHeight)
-      const ctx = canvas.getContext('2d')
-
-      // Draw resized image
-      ctx.drawImage(image, 0, 0, finalWidth, finalHeight)
-
-      // Convert canvas to buffer for cloud storage
-      const thumbnailBuffer = canvas.toBuffer('image/jpeg', { quality: 0.8 })
-
+    if (createCanvas && loadImage) {
       try {
-        // Upload thumbnail to cloud storage
-        thumbnailUrl = await saveThumbnailToCloudStorage(thumbnailBuffer, filename)
-      } catch (thumbnailError) {
-        console.error('Thumbnail upload error:', thumbnailError)
-        errors.push('Failed to upload generated thumbnail')
+        // Load image using canvas (Node.js environment)
+        const image = await loadImage(buffer)
 
-        // Fallback to base64 data URL for development
-        if (process.env.NODE_ENV === 'development') {
-          thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8)
+        metadata.originalWidth = image.width
+        metadata.originalHeight = image.height
+        metadata.aspectRatio = image.width / image.height
+
+        // Generate thumbnail
+        const { width: thumbWidth, height: thumbHeight } = FILE_UPLOAD_CONFIG.THUMBNAIL_SIZE
+
+        // Calculate dimensions maintaining aspect ratio
+        let finalWidth = thumbWidth
+        let finalHeight = thumbHeight
+
+        if (image.width > image.height) {
+          finalHeight = Math.round((thumbWidth / image.width) * image.height)
+        } else {
+          finalWidth = Math.round((thumbHeight / image.height) * image.width)
         }
+
+        // Create thumbnail canvas
+        const canvas = createCanvas(finalWidth, finalHeight)
+        const ctx = canvas.getContext('2d')
+
+        // Draw resized image
+        ctx.drawImage(image, 0, 0, finalWidth, finalHeight)
+
+        // Convert canvas to buffer for cloud storage
+        const thumbnailBuffer = canvas.toBuffer('image/jpeg', { quality: 0.8 })
+
+        try {
+          // Upload thumbnail to cloud storage
+          thumbnailUrl = await saveThumbnailToCloudStorage(thumbnailBuffer, filename)
+        } catch (thumbnailError) {
+          console.error('Thumbnail upload error:', thumbnailError)
+          errors.push('Failed to upload generated thumbnail')
+
+          // Fallback to base64 data URL for development
+          if (process.env.NODE_ENV === 'development') {
+            thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8)
+          }
+        }
+
+        metadata.thumbnailWidth = finalWidth
+        metadata.thumbnailHeight = finalHeight
+
+      } catch (imageError) {
+        console.error('Image processing error:', imageError)
+        errors.push('Failed to process image for thumbnail generation')
+      } finally {
+        URL.revokeObjectURL(imageUrl)
       }
-
-      metadata.thumbnailWidth = finalWidth
-      metadata.thumbnailHeight = finalHeight
-
-    } catch (imageError) {
-      console.error('Image processing error:', imageError)
-      errors.push('Failed to process image for thumbnail generation')
-    } finally {
-      URL.revokeObjectURL(imageUrl)
+    } else {
+      // Canvas not available - skip thumbnail generation
+      console.warn('Canvas not available - skipping thumbnail generation for image')
+      errors.push('Thumbnail generation skipped - canvas not available in production')
+      metadata.thumbnailSkipped = true
     }
 
     // For images, there's no text to extract unless we implement OCR
