@@ -2,7 +2,7 @@
 
 import { useChats, createChat } from '@/lib/database'
 import { useState } from 'react'
-import type { Chat } from '@/lib/instant'
+import type { ChatSession } from '@/lib/instant'
 
 interface ChatSidebarProps {
   currentChatId?: string | null
@@ -28,7 +28,7 @@ export default function ChatSidebar({ currentChatId, onChatSelect }: ChatSidebar
     }
   }
 
-  const formatChatTitle = (chat: Chat) => {
+  const formatChatTitle = (chat: ChatSession) => {
     if (chat.title && chat.title !== 'New Conversation') {
       return chat.title.length > 30 ? `${chat.title.substring(0, 30)  }...` : chat.title
     }

@@ -1,7 +1,7 @@
 // Advanced caching layer for educational content and query optimization
 // Designed for high-performance teacher workflows with InstantDB
 
-import { type Chat, type Message } from './instant'
+import { type ChatSession, type Message } from './instant'
 
 // In-memory cache for frequently accessed data
 interface CacheEntry<T> {
@@ -92,12 +92,12 @@ export class CacheManager {
   }
 
   // Chat metadata caching (moderate TTL)
-  static cacheChatMetadata(chatId: string, metadata: Partial<Chat>): void {
+  static cacheChatMetadata(chatId: string, metadata: Partial<ChatSession>): void {
     cache.set(`chat:${chatId}`, metadata, 10 * 60 * 1000) // 10 minutes
   }
 
-  static getCachedChatMetadata(chatId: string): Partial<Chat> | null {
-    return cache.get<Partial<Chat>>(`chat:${chatId}`)
+  static getCachedChatMetadata(chatId: string): Partial<ChatSession> | null {
+    return cache.get<Partial<ChatSession>>(`chat:${chatId}`)
   }
 
   // Recent messages caching (short TTL for real-time consistency)

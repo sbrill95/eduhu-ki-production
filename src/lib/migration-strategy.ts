@@ -5,13 +5,13 @@
 
 import {
   db,
-  generateId,
   type ChatSession,
   type Message,
   type Teacher,
   type TeacherPreferences,
   type TeacherMemory
 } from './instant'
+import { generateId } from './instant-server'
 
 // ============================================================================
 // MIGRATION TYPES AND INTERFACES
