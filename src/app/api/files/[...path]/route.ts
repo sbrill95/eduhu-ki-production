@@ -248,7 +248,7 @@ export async function GET(
       }
 
       // Return file with appropriate headers
-      return new NextResponse(fileBuffer, {
+      return new NextResponse(fileBuffer as unknown as BodyInit, {
         status: 200,
         headers
       })

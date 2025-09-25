@@ -308,7 +308,7 @@ export function getSecurityHeaders(filename?: string): HeadersInit {
  * Generate CORS preflight response headers
  */
 export function getCORSPreflightHeaders(origin: string | null): HeadersInit {
-  const headers: HeadersInit = {}
+  const headers = {} as Record<string, string>
 
   if (origin && validateCORSOrigin(origin)) {
     headers['Access-Control-Allow-Origin'] = origin
