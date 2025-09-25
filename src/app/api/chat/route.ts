@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
                         id: userMessageId,
                         session_id: sessionId,
                         teacher_id: teacherId,
-                        content: userMessage.content,
+                        content: textContent,
                         role: 'user',
                         timestamp: Date.now(),
                         content_type: 'text'
