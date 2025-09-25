@@ -338,13 +338,15 @@ export async function GET(
 // Enhanced HEAD request handler with S3 support
 export async function HEAD(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   const startTime = Date.now()
   let teacherId: string | null = null
 
   try {
-    const filePath = params.path.join('/')
+    // Await params in Next.js 15
+    const resolvedParams = await params
+    const filePath = resolvedParams.path.join('/')
 
     if (!filePath) {
       return new NextResponse(null, { status: 400 })
