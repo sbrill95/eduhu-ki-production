@@ -13,6 +13,11 @@ console.log('🔍 Running pre-deployment checks...\n');
 
 const checks = [
   {
+    name: 'TailwindCSS configuration',
+    command: 'npm run validate:tailwind',
+    description: 'Validates TailwindCSS setup and catches configuration errors'
+  },
+  {
     name: 'TypeScript compilation',
     command: 'npm run build',
     description: 'Checks if Next.js build succeeds'

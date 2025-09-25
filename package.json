@@ -35,6 +35,7 @@
     "generate:test-fixtures": "node scripts/generate-test-fixtures.js",
     "qa:report": "node scripts/generate-qa-report.js",
     "validate:ci-artifacts": "node scripts/validate-ci-artifacts.js",
+    "validate:tailwind": "node scripts/validate-tailwind.js",
     "pre-deploy": "node scripts/pre-deploy-check.js"
   },
   "keywords": [],
