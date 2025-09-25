@@ -558,39 +558,8 @@ export const getMemoryStatistics = async (teacherId: string): Promise<{
   }
 }
 
-// REACT HOOKS FOR MEMORY MANAGEMENT
-
-/**
- * React hook for getting teacher memories
- */
-export const useTeacherMemories = (
-  teacherId?: string,
-  memoryType?: 'preference' | 'pattern' | 'context' | 'skill'
-) => {
-  if (!teacherId) {
-    return { data: null, isLoading: false, error: null }
-  }
-
-  const whereClause: any = {
-    teacher_id: teacherId
-  }
-
-  if (memoryType) {
-    whereClause.memory_type = memoryType
-  }
-
-  return await serverDb.query({
-    teacher_memory: {
-      $: {
-        where: whereClause,
-        order: {
-          updated_at: 'desc'
-        },
-        limit: 100
-      }
-    }
-  })
-}
+// React hooks removed - not compatible with server-side code
+// Use the async functions above for server-side memory operations
 
 // Export types
 export type {

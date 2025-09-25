@@ -55,30 +55,25 @@ export default function ChatContainer({ sessionId }: ChatContainerProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messagesWithAttachments, streamingContent])
 
-  // Fetch file attachments for messages
+  // Fetch file attachments for messages - Fix infinite loop by using messages directly with useMemo
   useEffect(() => {
-    const fetchAttachments = async () => {
-      if (!messages.length) {
-        setMessagesWithAttachments([])
-        return
-      }
-
-      const messagesWithFiles = await Promise.all(
-        messages.map(async (message: Message) => {
-          // For now, we'll simulate file attachments since the database query needs to be implemented
-          // In a real implementation, you would query the file_uploads table by message_id
-          return {
-            ...message,
-            attachments: [] // Empty for now, would be populated from database query
-          } as MessageWithAttachments
-        })
-      )
-
-      setMessagesWithAttachments(messagesWithFiles)
+    if (!messages.length) {
+      setMessagesWithAttachments([])
+      return
     }
 
-    fetchAttachments()
-  }, [messages])
+    // Use setTimeout to break the synchronous loop and prevent infinite re-renders
+    const timeoutId = setTimeout(() => {
+      const messagesWithFiles = messages.map((message: Message) => ({
+        ...message,
+        attachments: [] // Empty for now, would be populated from database query
+      } as MessageWithAttachments))
+
+      setMessagesWithAttachments(messagesWithFiles)
+    }, 0)
+
+    return () => clearTimeout(timeoutId)
+  }, [messages.length, currentChatId]) // Use messages.length instead of messages to prevent infinite loops
 
   // Create chat if it doesn't exist
   useEffect(() => {

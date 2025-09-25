@@ -71,10 +71,10 @@ export default function BottomNavigation() {
       return pathname === '/'
     }
     if (href === '/library') {
-      return pathname?.startsWith('/library')
+      return pathname.startsWith('/library')
     }
     if (href === '/chat/new') {
-      return pathname?.startsWith('/chat')
+      return pathname.startsWith('/chat')
     }
     return false
   }

@@ -1,0 +1,419 @@
+import {
+  createChatSession,
+  getChatSession,
+  addMessageToSession,
+  getChatSessions,
+  deleteMessage,
+  updateSessionTitle,
+  validateSessionAccess,
+  archiveSession,
+  getSessionMetrics,
+  cleanup
+} from './database'
+
+// Mock dependencies
+jest.mock('./instant', () => ({
+  db: {
+    transact: jest.fn(),
+    tx: {
+      chat_sessions: {
+        'session-123': {
+          update: jest.fn()
+        }
+      },
+      messages: {
+        'message-123': {
+          update: jest.fn(),
+          delete: jest.fn()
+        }
+      }
+    }
+  }
+}))
+
+jest.mock('./instant-server', () => ({
+  serverDb: {
+    transact: jest.fn(),
+    query: jest.fn(),
+    tx: {
+      chat_sessions: jest.fn(() => ({
+        update: jest.fn()
+      })),
+      messages: jest.fn(() => ({
+        update: jest.fn(),
+        delete: jest.fn()
+      }))
+    }
+  },
+  generateId: jest.fn(() => 'generated-id-123')
+}))
+
+// Mock crypto for client-side UUID generation
+Object.defineProperty(global, 'crypto', {
+  value: {
+    randomUUID: jest.fn(() => 'client-uuid-123')
+  }
+})
+
+describe('Database Functions', () => {
+  const mockDb = require('./instant').db
+  const mockServerDb = require('./instant-server').serverDb
+  const mockGenerateId = require('./instant-server').generateId
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+
+    // Setup default successful mocks
+    mockDb.transact.mockResolvedValue({})
+    mockServerDb.transact.mockResolvedValue({})
+    mockServerDb.query.mockResolvedValue({
+      data: { chat_sessions: {}, messages: {} }
+    })
+  })
+
+  describe('createChatSession', () => {
+    it('should create a new chat session with default parameters', async () => {
+      const teacherId = 'teacher-123'
+      const sessionId = await createChatSession(teacherId)
+
+      expect(sessionId).toBe('generated-id-123')
+      expect(mockServerDb.transact).toHaveBeenCalled()
+    })
+
+    it('should create a session with custom title and type', async () => {
+      const teacherId = 'teacher-123'
+      const title = 'Custom Session Title'
+      const sessionType = 'lesson_planning'
+
+      const sessionId = await createChatSession(teacherId, title, sessionType)
+
+      expect(sessionId).toBe('generated-id-123')
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            teacher_id: teacherId,
+            title: title,
+            session_type: sessionType
+          })
+        ])
+      )
+    })
+
+    it('should handle transaction failures with retry', async () => {
+      mockServerDb.transact
+        .mockRejectedValueOnce(new Error('Transaction failed'))
+        .mockResolvedValueOnce({})
+
+      const teacherId = 'teacher-123'
+      const sessionId = await createChatSession(teacherId)
+
+      expect(sessionId).toBe('generated-id-123')
+      expect(mockServerDb.transact).toHaveBeenCalledTimes(2)
+    })
+
+    it('should use client-side UUID generation in browser', async () => {
+      // Mock window to simulate browser environment
+      Object.defineProperty(global, 'window', {
+        value: {},
+        configurable: true
+      })
+
+      const teacherId = 'teacher-123'
+      const sessionId = await createChatSession(teacherId)
+
+      expect(sessionId).toBe('client-uuid-123')
+      expect(mockDb.transact).toHaveBeenCalled()
+
+      // Clean up
+      delete global.window
+    })
+  })
+
+  describe('getChatSession', () => {
+    it('should retrieve an existing chat session', async () => {
+      const mockSession = {
+        id: 'session-123',
+        teacher_id: 'teacher-123',
+        title: 'Test Session',
+        created_at: Date.now()
+      }
+
+      mockServerDb.query.mockResolvedValue({
+        data: {
+          chat_sessions: {
+            'session-123': mockSession
+          }
+        }
+      })
+
+      const session = await getChatSession('session-123')
+
+      expect(session).toEqual(mockSession)
+      expect(mockServerDb.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chat_sessions: expect.objectContaining({
+            $: {
+              where: { id: 'session-123' }
+            }
+          })
+        })
+      )
+    })
+
+    it('should return null for non-existent session', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: { chat_sessions: {} }
+      })
+
+      const session = await getChatSession('non-existent')
+
+      expect(session).toBeNull()
+    })
+
+    it('should handle database query errors', async () => {
+      mockServerDb.query.mockRejectedValue(new Error('Database error'))
+
+      await expect(getChatSession('session-123')).rejects.toThrow('Database error')
+    })
+  })
+
+  describe('addMessageToSession', () => {
+    it('should add a message to a session', async () => {
+      const messageData = {
+        sessionId: 'session-123',
+        content: 'Test message',
+        role: 'user' as const,
+        teacherId: 'teacher-123'
+      }
+
+      const messageId = await addMessageToSession(messageData)
+
+      expect(messageId).toBe('generated-id-123')
+      expect(mockServerDb.transact).toHaveBeenCalled()
+    })
+
+    it('should include file attachments when provided', async () => {
+      const messageData = {
+        sessionId: 'session-123',
+        content: 'Test message with files',
+        role: 'user' as const,
+        teacherId: 'teacher-123',
+        fileAttachments: ['file1', 'file2']
+      }
+
+      const messageId = await addMessageToSession(messageData)
+
+      expect(messageId).toBe('generated-id-123')
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            file_attachments: ['file1', 'file2']
+          })
+        ])
+      )
+    })
+
+    it('should update session last_message_at', async () => {
+      const messageData = {
+        sessionId: 'session-123',
+        content: 'Test message',
+        role: 'user' as const,
+        teacherId: 'teacher-123'
+      }
+
+      await addMessageToSession(messageData)
+
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            session_id: 'session-123',
+            content: 'Test message'
+          }),
+          expect.objectContaining({
+            last_message_at: expect.any(Number)
+          })
+        ])
+      )
+    })
+  })
+
+  describe('validateSessionAccess', () => {
+    it('should return true for valid session access', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: {
+          chat_sessions: {
+            'session-123': {
+              id: 'session-123',
+              teacher_id: 'teacher-123'
+            }
+          }
+        }
+      })
+
+      const hasAccess = await validateSessionAccess('session-123', 'teacher-123')
+
+      expect(hasAccess).toBe(true)
+    })
+
+    it('should return false for invalid session access', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: {
+          chat_sessions: {
+            'session-123': {
+              id: 'session-123',
+              teacher_id: 'other-teacher'
+            }
+          }
+        }
+      })
+
+      const hasAccess = await validateSessionAccess('session-123', 'teacher-123')
+
+      expect(hasAccess).toBe(false)
+    })
+
+    it('should return false for non-existent session', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: { chat_sessions: {} }
+      })
+
+      const hasAccess = await validateSessionAccess('non-existent', 'teacher-123')
+
+      expect(hasAccess).toBe(false)
+    })
+  })
+
+  describe('getChatSessions', () => {
+    it('should retrieve chat sessions for a teacher', async () => {
+      const mockSessions = {
+        'session-1': {
+          id: 'session-1',
+          teacher_id: 'teacher-123',
+          title: 'Session 1'
+        },
+        'session-2': {
+          id: 'session-2',
+          teacher_id: 'teacher-123',
+          title: 'Session 2'
+        }
+      }
+
+      mockServerDb.query.mockResolvedValue({
+        data: { chat_sessions: mockSessions }
+      })
+
+      const sessions = await getChatSessions('teacher-123')
+
+      expect(sessions).toEqual(Object.values(mockSessions))
+      expect(mockServerDb.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chat_sessions: expect.objectContaining({
+            $: {
+              where: { teacher_id: 'teacher-123' }
+            }
+          })
+        })
+      )
+    })
+
+    it('should return empty array when no sessions found', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: { chat_sessions: {} }
+      })
+
+      const sessions = await getChatSessions('teacher-123')
+
+      expect(sessions).toEqual([])
+    })
+  })
+
+  describe('deleteMessage', () => {
+    it('should delete a message and update session', async () => {
+      await deleteMessage('message-123', 'session-123')
+
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            // Message deletion transaction
+          }),
+          expect.objectContaining({
+            // Session update transaction
+            updated_at: expect.any(Number)
+          })
+        ])
+      )
+    })
+
+    it('should handle deletion errors gracefully', async () => {
+      mockServerDb.transact.mockRejectedValue(new Error('Deletion failed'))
+
+      await expect(deleteMessage('message-123', 'session-123')).rejects.toThrow('Deletion failed')
+    })
+  })
+
+  describe('updateSessionTitle', () => {
+    it('should update session title', async () => {
+      await updateSessionTitle('session-123', 'New Title')
+
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            title: 'New Title',
+            updated_at: expect.any(Number)
+          })
+        ])
+      )
+    })
+  })
+
+  describe('archiveSession', () => {
+    it('should archive a session', async () => {
+      await archiveSession('session-123', true)
+
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            is_archived: true,
+            updated_at: expect.any(Number)
+          })
+        ])
+      )
+    })
+
+    it('should unarchive a session', async () => {
+      await archiveSession('session-123', false)
+
+      expect(mockServerDb.transact).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            is_archived: false,
+            updated_at: expect.any(Number)
+          })
+        ])
+      )
+    })
+  })
+
+  describe('getSessionMetrics', () => {
+    it('should calculate session metrics', async () => {
+      mockServerDb.query.mockResolvedValue({
+        data: {
+          chat_sessions: {
+            'session-1': { message_count: 5 },
+            'session-2': { message_count: 3 }
+          },
+          messages: {
+            'msg-1': { created_at: Date.now() - 1000 },
+            'msg-2': { created_at: Date.now() - 2000 }
+          }
+        }
+      })
+
+      const metrics = await getSessionMetrics('teacher-123')
+
+      expect(metrics).toHaveProperty('totalSessions')
+      expect(metrics).toHaveProperty('totalMessages')
+      expect(metrics).toHaveProperty('averageMessagesPerSession')
+    })
+  })
+})
