@@ -288,6 +288,13 @@ export const updateChatTitle = async (sessionId: string, title: string): Promise
   return updateChatSession(sessionId, { title })
 }
 
+// Legacy function - creates a chat session with default teacher
+export const createChat = async (title?: string): Promise<string> => {
+  // For now, use a default teacher ID. In production, this should come from auth context
+  const defaultTeacherId = 'default-teacher'
+  return createChatSession(defaultTeacherId, title, 'general')
+}
+
 // Legacy function - redirects to new session-based system
 export const addMessage = async (
   sessionId: string,
