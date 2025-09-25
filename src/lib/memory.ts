@@ -1,8 +1,8 @@
 // PRIORITY 2 - MEMORY MANAGEMENT SYSTEM
 // Advanced teacher memory and context persistence for eduhu.ki
 
-import { db, type TeacherMemory, type Message, MEMORY_CONFIG } from './instant'
-import { id } from '@instantdb/react'
+import { serverDb, type TeacherMemory, type Message, MEMORY_CONFIG } from './instant-server'
+import { id } from '@instantdb/core'
 import { DatabaseError, withRetry } from './database'
 
 // CORE MEMORY OPERATIONS
@@ -46,8 +46,8 @@ export const saveMemory = async (
       const now = Date.now()
 
       await withRetry(async () => {
-        return db.transact([
-          db.tx.teacher_memory[memoryId].update({
+        return serverDb.transact([
+          serverDb.tx.teacher_memory(memoryId).update({
             teacher_id: teacherId,
             memory_type: memoryType,
             key,
@@ -93,7 +93,7 @@ export const getMemories = async (
       whereClause.memory_type = memoryType
     }
 
-    const result = await db.query({
+    const result = await serverDb.query({
       teacher_memory: {
         $: {
           where: whereClause,
@@ -141,7 +141,7 @@ export const getMemory = async (
   memoryType: 'preference' | 'pattern' | 'context' | 'skill'
 ): Promise<TeacherMemory | null> => {
   try {
-    const result = await db.query({
+    const result = await serverDb.query({
       teacher_memory: {
         $: {
           where: {
@@ -185,8 +185,8 @@ export const updateMemory = async (
     }
 
     await withRetry(async () => {
-      return db.transact([
-        db.tx.teacher_memory[memoryId].update(updateData)
+      return serverDb.transact([
+        serverDb.tx.teacher_memory(memoryId).update(updateData)
       ])
     })
 
@@ -433,11 +433,11 @@ const updateMemoryAccess = async (memoryIds: string[]): Promise<void> => {
   try {
     const now = Date.now()
     const transactions = memoryIds.map(id =>
-      db.tx.teacher_memory[id].update({ last_accessed: now })
+      serverDb.tx.teacher_memory(id).update({ last_accessed: now })
     )
 
     await withRetry(async () => {
-      return db.transact(transactions)
+      return serverDb.transact(transactions)
     })
   } catch (error) {
     // Non-critical operation, log but don't throw
@@ -475,12 +475,12 @@ export const cleanupMemories = async (teacherId: string): Promise<{
 
     // Mark low confidence memories as expired
     const cleanupTransactions = lowConfidenceMemories.map(m =>
-      db.tx.teacher_memory[m.id].update({ expires_at: now })
+      serverDb.tx.teacher_memory(m.id).update({ expires_at: now })
     )
 
     if (cleanupTransactions.length > 0) {
       await withRetry(async () => {
-        return db.transact(cleanupTransactions)
+        return serverDb.transact(cleanupTransactions)
       })
     }
 
@@ -579,7 +579,7 @@ export const useTeacherMemories = (
     whereClause.memory_type = memoryType
   }
 
-  return db.useQuery({
+  return await serverDb.query({
     teacher_memory: {
       $: {
         where: whereClause,
