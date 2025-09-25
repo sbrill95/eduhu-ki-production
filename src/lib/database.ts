@@ -294,7 +294,7 @@ export const addMessage = async (
   content: string,
   role: 'user' | 'assistant' | 'system',
   options?: {
-    contentType?: 'text' | 'artifact' | 'image'
+    contentType?: 'text' | 'artifact' | 'image' | 'file_attachment'
     tokenCount?: number
     responseTimeMs?: number
     educationalTopics?: string[]
