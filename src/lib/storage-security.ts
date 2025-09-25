@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 
 // Optional JWT import - graceful degradation if not available
 let jwt: any = null

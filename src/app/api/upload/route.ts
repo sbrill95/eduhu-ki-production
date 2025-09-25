@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, FILE_UPLOAD_CONFIG, type FileUpload } from '@/lib/instant'
 import { processFile } from '@/lib/file-processing'
 import { saveFileToCloudStorage, getStorageInfo } from '@/lib/file-storage'
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 
 export const runtime = 'nodejs' // Required for file processing
 export const dynamic = 'force-dynamic'

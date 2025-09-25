@@ -1,7 +1,7 @@
 import { writeFile, mkdir, unlink, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 import { FILE_UPLOAD_CONFIG } from '@/lib/instant'
 
 // Configuration for file storage

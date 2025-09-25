@@ -15,7 +15,7 @@ import {
 import type { Message } from '@/lib/instant'
 import { startMetricsCollection, PerformanceMonitor } from '@/lib/metrics'
 import { CacheManager } from '@/lib/cache'
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 
 interface ChatContainerProps {
   sessionId: string
