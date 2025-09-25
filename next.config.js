@@ -51,7 +51,6 @@ const nextConfig = {
   },
 
   // Production optimizations
-  swcMinify: true,
   reactStrictMode: true,
 
   // Environment-specific configurations
