@@ -1,0 +1,27 @@
+#!/bin/bash
+# Pre-commit hook to prevent deployment failures
+# This MUST pass before any commit is allowed
+
+echo "🔍 Running pre-commit verification..."
+
+# 1. TypeScript compilation check
+echo "📝 Checking TypeScript compilation..."
+npm run build > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ TypeScript compilation failed!"
+    echo "Run 'npm run build' to see errors"
+    echo "Fix all errors before committing."
+    exit 1
+fi
+
+# 2. Quick type check without build
+echo "🔧 Running quick TypeScript check..."
+npx tsc --noEmit --skipLibCheck > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ TypeScript type checking failed!"
+    echo "Run 'npx tsc --noEmit' to see errors"
+    exit 1
+fi
+
+echo "✅ Pre-commit checks passed!"
+echo "🚀 Safe to commit and deploy!"

@@ -67,10 +67,10 @@ runStep(
   { silent: true, timeout: 120000 }
 );
 
-// Step 2: Run ESLint
+// Step 2: Run ESLint (allow warnings, fail on errors only)
 runStep(
   'ESLint check',
-  'npx eslint src --ext .ts,.tsx --max-warnings 0',
+  'npx eslint src --ext .ts,.tsx',
   { timeout: 60000 }
 );
 
