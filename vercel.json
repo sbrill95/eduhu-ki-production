@@ -13,9 +13,7 @@
     "NEXT_PUBLIC_AI_MODEL": "gpt-4o-mini"
   },
   "build": {
-    "env": {
-      "OPENAI_API_KEY": "@openai-api-key"
-    }
+    "env": {}
   },
   "headers": [
     {
