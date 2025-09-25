@@ -210,7 +210,7 @@ export async function GET(
       }
 
       // Get appropriate headers for file type
-      const headers = getFileServingHeaders(filename, mimeType)
+      const headers = getFileServingHeaders(filename, mimeType) as Record<string, string>
 
       // Add file size header
       headers['Content-Length'] = fileStats.size.toString()
@@ -462,7 +462,7 @@ export async function HEAD(
           break
       }
 
-      const headers = getFileServingHeaders(filename, mimeType)
+      const headers = getFileServingHeaders(filename, mimeType) as Record<string, string>
       headers['Content-Length'] = fileStats.size.toString()
       headers['X-Served-From'] = servedFromLocal ? 'local' : (servedFromS3 ? 's3' : 'unknown')
       headers['X-File-Path'] = filePath
