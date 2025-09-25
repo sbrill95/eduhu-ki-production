@@ -298,13 +298,15 @@ export const addMessage = async (
     tokenCount?: number
     responseTimeMs?: number
     educationalTopics?: string[]
+    fileAttachments?: string[]
   }
 ): Promise<string> => {
   return addMessageToSession(sessionId, content, role, {
     contentType: options?.contentType,
     tokenCount: options?.tokenCount,
     responseTimeMs: options?.responseTimeMs,
-    educationalTopics: options?.educationalTopics
+    educationalTopics: options?.educationalTopics,
+    metadata: options?.fileAttachments ? { fileAttachments: options.fileAttachments } : undefined
   })
 }
 
